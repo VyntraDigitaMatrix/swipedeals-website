@@ -5,12 +5,15 @@ import WishlistButton from '../common/WishlistButton'
 import Rating from '../common/Rating'
 import Badge from '../common/Badge'
 import { useCompare } from '../../hooks/useCompare'
+import { usePublicImages } from '../../hooks/usePublicImages'
 import { getDealerById } from '../../data/dealers'
+import { sparePartsService } from '../../services/publicListingService'
 import { formatCurrencyFull } from '../../utils/format'
 import { cn } from '../../utils/cn'
 
 export default function SparePartCard({ part, index = 0 }) {
   const dealer = getDealerById(part.dealerId)
+  const images = usePublicImages(sparePartsService.getImages, part.id, part.images)
   const { isComparing, toggleCompare } = useCompare()
   const comparing = isComparing(part.id)
   const discount = part.originalPrice ? Math.round(((part.originalPrice - part.price) / part.originalPrice) * 100) : 0
@@ -24,7 +27,7 @@ export default function SparePartCard({ part, index = 0 }) {
       className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift"
     >
       <Link to={`/spare-parts/${part.id}`} className="relative block aspect-square overflow-hidden bg-surface-alt">
-        <img src={part.images[0]} alt={part.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
+        <img src={images[0]} alt={part.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
         <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
           {discount > 0 && (
             <Badge variant="danger" icon={TagIcon} className="bg-white/95">
@@ -45,11 +48,13 @@ export default function SparePartCard({ part, index = 0 }) {
         <Link to={`/spare-parts/${part.id}`} className="mb-1 line-clamp-1 text-[15px] font-bold text-text hover:text-primary">
           {part.title}
         </Link>
-        <div className="mb-2 flex items-center gap-1.5 text-xs text-text-secondary">
-          <MapPin size={12} className="shrink-0" aria-hidden="true" />
-          <span className="line-clamp-1">{part.location}</span>
-        </div>
-        <Rating value={part.rating} size={12} />
+        {part.location && (
+          <div className="mb-2 flex items-center gap-1.5 text-xs text-text-secondary">
+            <MapPin size={12} className="shrink-0" aria-hidden="true" />
+            <span className="line-clamp-1">{part.location}</span>
+          </div>
+        )}
+        {part.rating != null && <Rating value={part.rating} size={12} />}
 
         <div className="mt-auto flex items-end justify-between border-t border-border pt-3">
           <div>

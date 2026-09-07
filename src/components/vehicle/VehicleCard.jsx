@@ -5,7 +5,9 @@ import WishlistButton from '../common/WishlistButton'
 import Rating from '../common/Rating'
 import Badge from '../common/Badge'
 import { useCompare } from '../../hooks/useCompare'
+import { usePublicImages } from '../../hooks/usePublicImages'
 import { getDealerById } from '../../data/dealers'
+import { vehicleService } from '../../services/publicListingService'
 import { formatCurrency, formatKm } from '../../utils/format'
 import { cn } from '../../utils/cn'
 
@@ -13,6 +15,7 @@ const OWNER_LABEL = { 1: '1st Owner', 2: '2nd Owner', 3: '3rd Owner' }
 
 export default function VehicleCard({ car, index = 0 }) {
   const dealer = getDealerById(car.dealerId)
+  const images = usePublicImages(vehicleService.getImages, car.id, car.images)
   const { isComparing, toggleCompare } = useCompare()
   const comparing = isComparing(car.id)
   const greatPrice = car.condition === 'used' && car.rating >= 4.8
@@ -27,7 +30,7 @@ export default function VehicleCard({ car, index = 0 }) {
     >
       <Link to={`/cars/${car.id}`} className="relative block aspect-[4/3] overflow-hidden bg-surface-alt">
         <img
-          src={car.images[0]}
+          src={images[0]}
           alt={`${car.year} ${car.title}`}
           loading="lazy"
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
@@ -51,10 +54,10 @@ export default function VehicleCard({ car, index = 0 }) {
         </div>
         <WishlistButton id={car.id} className="absolute right-3 top-3" />
 
-        {car.images.length > 1 && (
+        {images.length > 1 && (
           <span className="absolute bottom-2.5 right-3 flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
             <Camera size={11} aria-hidden="true" />
-            {car.images.length}
+            {images.length}
           </span>
         )}
       </Link>
@@ -64,12 +67,14 @@ export default function VehicleCard({ car, index = 0 }) {
           <span className="font-semibold text-text-secondary">{car.year}</span> {car.title}
         </Link>
 
-        <div className="mt-1.5 flex items-center gap-1.5 text-xs text-text-secondary">
-          <MapPin size={12} className="shrink-0" aria-hidden="true" />
-          <span className="line-clamp-1">{car.location}</span>
-        </div>
+        {car.location && (
+          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-text-secondary">
+            <MapPin size={12} className="shrink-0" aria-hidden="true" />
+            <span className="line-clamp-1">{car.location}</span>
+          </div>
+        )}
 
-        <Rating value={car.rating} size={12} className="mt-2" />
+        {car.rating != null && <Rating value={car.rating} size={12} className="mt-2" />}
 
         <div className="my-3 grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-surface-alt/60 text-center text-[11px] text-text-secondary">
           <span className="flex flex-col items-center gap-1 px-1 py-2">
@@ -89,7 +94,7 @@ export default function VehicleCard({ car, index = 0 }) {
         <div className="mt-auto flex items-end justify-between gap-2 border-t border-border pt-3">
           <div className="min-w-0">
             <p className="text-lg font-extrabold text-text">{formatCurrency(car.price)}</p>
-            <p className="text-[11px] text-text-secondary">EMI from {formatCurrency(car.emi)}/mo</p>
+            {car.emi != null && <p className="text-[11px] text-text-secondary">EMI from {formatCurrency(car.emi)}/mo</p>}
           </div>
           {dealer && (
             <Link

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Home as HomeIcon } from 'lucide-react'
 import Breadcrumb from '../components/common/Breadcrumb'
@@ -8,21 +8,49 @@ import ListingGrid from '../components/listing/ListingGrid'
 import Pagination from '../components/common/Pagination'
 import PropertyCard from '../components/property/PropertyCard'
 import CommunityListingsStrip from '../components/common/CommunityListingsStrip'
-import { properties, propertyTypes } from '../data/properties'
+import { propertyService, mapPropertyToCard } from '../services/publicListingService'
 
 const PAGE_SIZE = 8
+
+// A pre-existing link elsewhere in the app may still pass ?purpose=Buy —
+// map that onto the real "Sale" bucket our mapped data uses.
+const normalizePurpose = (value) => (value === 'Buy' ? 'Sale' : value)
 
 export default function Properties() {
   const [searchParams] = useSearchParams()
   const q = searchParams.get('q') || ''
 
+  const [properties, setProperties] = useState([])
+  const [loading, setLoading] = useState(true)
   const [values, setValues] = useState(() => ({
-    type: propertyTypes.includes(searchParams.get('type')) ? [searchParams.get('type')] : [],
-    purpose: ['Buy', 'Rent'].includes(searchParams.get('purpose')) ? [searchParams.get('purpose')] : [],
+    type: searchParams.get('type') ? [searchParams.get('type')] : [],
+    purpose: searchParams.get('purpose') ? [normalizePurpose(searchParams.get('purpose'))] : [],
   }))
   const [priceRange, setPriceRange] = useState([0, 55000000])
   const [sort, setSort] = useState('relevance')
   const [page, setPage] = useState(1)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    propertyService
+      .getAll({ size: 100, sort: 'createdAt,desc' })
+      .then((res) => {
+        if (cancelled) return
+        const content = res?.data?.content
+        setProperties(Array.isArray(content) ? content.map(mapPropertyToCard) : [])
+      })
+      .catch((err) => {
+        console.error('Failed to fetch properties:', err)
+        if (!cancelled) setProperties([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  const propertyTypes = useMemo(() => [...new Set(properties.map((p) => p.type))].sort(), [properties])
 
   const toggleValue = (key, val) => {
     setValues((prev) => ({ ...prev, [key]: prev[key].includes(val) ? prev[key].filter((v) => v !== val) : [...prev[key], val] }))
@@ -44,9 +72,8 @@ export default function Properties() {
     })
     if (sort === 'price-asc') list = [...list].sort((a, b) => a.price - b.price)
     if (sort === 'price-desc') list = [...list].sort((a, b) => b.price - a.price)
-    if (sort === 'rating') list = [...list].sort((a, b) => b.rating - a.rating)
     return list
-  }, [q, values, priceRange, sort])
+  }, [properties, q, values, priceRange, sort])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -75,7 +102,7 @@ export default function Properties() {
           onClear={clearAll}
           priceRange={{ min: 0, max: 55000000, value: priceRange, onChange: (v) => { setPriceRange(v); setPage(1) } }}
           groups={[
-            { key: 'purpose', title: 'Purpose', options: [{ value: 'Buy', label: 'Buy' }, { value: 'Rent', label: 'Rent' }] },
+            { key: 'purpose', title: 'Purpose', options: [{ value: 'Sale', label: 'Buy' }, { value: 'Rent', label: 'Rent' }, { value: 'Lease', label: 'Lease' }] },
             { key: 'type', title: 'Property Type', options: propertyTypes.map((t) => ({ value: t, label: t })) },
           ]}
         />
@@ -83,6 +110,7 @@ export default function Properties() {
           <ListingToolbar count={filtered.length} sort={sort} onSortChange={setSort} />
           <ListingGrid
             items={pageItems}
+            loading={loading}
             renderItem={(p, i) => <PropertyCard key={p.id} property={p} index={i} />}
             emptyProps={{ icon: HomeIcon, title: 'No properties match your filters', actionLabel: 'Reset Filters', onAction: clearAll }}
           />

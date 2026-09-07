@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Settings } from 'lucide-react'
 import Breadcrumb from '../components/common/Breadcrumb'
@@ -8,18 +8,42 @@ import ListingGrid from '../components/listing/ListingGrid'
 import Pagination from '../components/common/Pagination'
 import SparePartCard from '../components/cards/SparePartCard'
 import CommunityListingsStrip from '../components/common/CommunityListingsStrip'
-import { spareParts, sparePartCategories } from '../data/spareParts'
+import { sparePartsService, mapSparePartToCard } from '../services/publicListingService'
 
 const PAGE_SIZE = 8
-const BRANDS = [...new Set(spareParts.map((s) => s.brand))]
 
 export default function SpareParts() {
   const [searchParams] = useSearchParams()
   const q = searchParams.get('q') || ''
 
+  const [spareParts, setSpareParts] = useState([])
+  const [loading, setLoading] = useState(true)
   const [values, setValues] = useState({ category: [], brand: [] })
   const [sort, setSort] = useState('relevance')
   const [page, setPage] = useState(1)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    sparePartsService
+      .getAll({ size: 100, sort: 'createdAt,desc' })
+      .then((res) => {
+        if (cancelled) return
+        const content = res?.data?.content
+        setSpareParts(Array.isArray(content) ? content.map(mapSparePartToCard) : [])
+      })
+      .catch((err) => {
+        console.error('Failed to fetch spare parts:', err)
+        if (!cancelled) setSpareParts([])
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [])
+
+  const categories = useMemo(() => [...new Set(spareParts.map((s) => s.category))].sort(), [spareParts])
+  const brands = useMemo(() => [...new Set(spareParts.map((s) => s.brand))].sort(), [spareParts])
 
   const toggleValue = (key, val) => {
     setValues((prev) => ({ ...prev, [key]: prev[key].includes(val) ? prev[key].filter((v) => v !== val) : [...prev[key], val] }))
@@ -39,9 +63,8 @@ export default function SpareParts() {
     })
     if (sort === 'price-asc') list = [...list].sort((a, b) => a.price - b.price)
     if (sort === 'price-desc') list = [...list].sort((a, b) => b.price - a.price)
-    if (sort === 'rating') list = [...list].sort((a, b) => b.rating - a.rating)
     return list
-  }, [q, values, sort])
+  }, [spareParts, q, values, sort])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -69,14 +92,15 @@ export default function SpareParts() {
           onToggle={toggleValue}
           onClear={clearAll}
           groups={[
-            { key: 'category', title: 'Category', options: sparePartCategories.map((c) => ({ value: c, label: c })) },
-            { key: 'brand', title: 'Brand', options: BRANDS.map((b) => ({ value: b, label: b })) },
+            { key: 'category', title: 'Category', options: categories.map((c) => ({ value: c, label: c })) },
+            { key: 'brand', title: 'Brand', options: brands.map((b) => ({ value: b, label: b })) },
           ]}
         />
         <div className="flex-1">
           <ListingToolbar count={filtered.length} sort={sort} onSortChange={setSort} />
           <ListingGrid
             items={pageItems}
+            loading={loading}
             renderItem={(part, i) => <SparePartCard key={part.id} part={part} index={i} />}
             emptyProps={{ icon: Settings, title: 'No spare parts match your filters', actionLabel: 'Reset Filters', onAction: clearAll }}
           />

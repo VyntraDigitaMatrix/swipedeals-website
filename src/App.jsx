@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom'
 import Layout from './components/layout/Layout'
+import PrivateRoute from './components/routing/PrivateRoute'
 
 import Home from './pages/Home'
 import CarsListing from './pages/CarsListing'
@@ -73,7 +74,9 @@ function App() {
         <Route path="/sell/electronics" element={<SellElectronics />} />
         <Route path="/sell/properties" element={<SellProperty />} />
         <Route path="/kyc" element={<Kyc />} />
-        <Route path="/dashboard" element={<Dashboard />} />
+        <Route element={<PrivateRoute />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+        </Route>
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/listing/:id" element={<ListingDetails />} />
 

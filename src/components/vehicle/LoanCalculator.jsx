@@ -33,7 +33,7 @@ export default function LoanCalculator({ price }) {
       </h2>
       <p className="mb-5 text-xs text-text-secondary">Estimate your monthly installment for this car</p>
 
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className="grid gap-5">
         <div>
           <div className="mb-1.5 flex items-center justify-between text-xs">
             <span className="font-semibold text-text-secondary">Down Payment</span>
@@ -70,7 +70,7 @@ export default function LoanCalculator({ price }) {
           />
         </div>
 
-        <div className="sm:col-span-2">
+        <div>
           <div className="mb-1.5 flex items-center justify-between text-xs">
             <span className="font-semibold text-text-secondary">Interest Rate (p.a.)</span>
             <span className="font-bold text-text">{rate.toFixed(1)}%</span>

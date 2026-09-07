@@ -24,6 +24,7 @@ export default function DetailLayout({
   children,
   similar,
   sellerCard,
+  belowContact,
 }) {
   const dealer = getDealerById(item.dealerId)
 
@@ -46,9 +47,11 @@ export default function DetailLayout({
                   ))}
                 </div>
                 <h1 className="text-2xl font-extrabold text-text sm:text-3xl">{item.title}</h1>
-                <p className="mt-1.5 flex items-center gap-1.5 text-sm text-text-secondary">
-                  <MapPin size={14} aria-hidden="true" /> {item.location}
-                </p>
+                {item.location && (
+                  <p className="mt-1.5 flex items-center gap-1.5 text-sm text-text-secondary">
+                    <MapPin size={14} aria-hidden="true" /> {item.location}
+                  </p>
+                )}
                 <Rating value={item.rating} reviews={dealer?.reviews} className="mt-2" />
               </div>
               <WishlistButton id={item.id} size={20} className="shrink-0 !bg-surface-alt" />
@@ -94,6 +97,8 @@ export default function DetailLayout({
               <ShieldCheck size={13} className="text-success" aria-hidden="true" /> Safe & secure transaction guaranteed
             </p>
           </div>
+
+          {belowContact}
 
           {sellerCard || (dealer && (
             <div className="rounded-2xl border border-border bg-surface p-6 shadow-soft">

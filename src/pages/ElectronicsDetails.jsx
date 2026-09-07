@@ -1,16 +1,63 @@
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { BadgeCheck, Package, ShieldCheck, Tag as TagIcon } from 'lucide-react'
+import { Package, ShieldCheck } from 'lucide-react'
 import DetailLayout from '../components/listing/DetailLayout'
 import ElectronicsCard from '../components/electronics/ElectronicsCard'
 import EmptyState from '../components/common/EmptyState'
-import { electronics, getElectronicsById } from '../data/electronics'
+import { electronicsService, mapElectronicsToCard } from '../services/publicListingService'
+import { usePublicImages } from '../hooks/usePublicImages'
+import { PLACEHOLDER_IMAGE } from '../utils/enumFormat'
 import { formatCurrencyFull } from '../utils/format'
 
 export default function ElectronicsDetails() {
-  const { id } = useParams()
-  const item = getElectronicsById(id)
+  const { id: slug } = useParams()
 
-  if (!item) {
+  const [raw, setRaw] = useState(null)
+  const [similarRaw, setSimilarRaw] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [notFound, setNotFound] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setNotFound(false)
+    electronicsService
+      .getBySlug(slug)
+      .then((res) => {
+        if (!cancelled) setRaw(res?.data ?? null)
+      })
+      .catch(() => {
+        if (!cancelled) setNotFound(true)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [slug])
+
+  useEffect(() => {
+    if (!raw) return
+    let cancelled = false
+    electronicsService
+      .getAll({ type: raw.type, size: 7, sort: 'createdAt,desc' })
+      .then((res) => {
+        if (cancelled) return
+        const content = res?.data?.content
+        setSimilarRaw(Array.isArray(content) ? content.filter((e) => e.slug !== raw.slug).slice(0, 6) : [])
+      })
+      .catch(() => {
+        if (!cancelled) setSimilarRaw([])
+      })
+    return () => { cancelled = true }
+  }, [raw])
+
+  const images = usePublicImages(electronicsService.getImages, slug, [PLACEHOLDER_IMAGE])
+
+  if (loading) {
+    return <div className="container-page py-16 text-center text-sm text-text-secondary">Loading…</div>
+  }
+
+  if (notFound || !raw) {
     return (
       <div className="container-page py-16">
         <EmptyState title="Product not found" description="This listing may have been sold or removed." actionLabel="Browse Electronics" actionTo="/electronics" />
@@ -18,8 +65,8 @@ export default function ElectronicsDetails() {
     )
   }
 
-  const discount = item.originalPrice ? Math.round(((item.originalPrice - item.price) / item.originalPrice) * 100) : 0
-  const similar = electronics.filter((e) => e.id !== item.id && e.category === item.category).slice(0, 6)
+  const item = { ...mapElectronicsToCard(raw), images, location: '' }
+  const similar = similarRaw.map(mapElectronicsToCard)
 
   return (
     <DetailLayout
@@ -28,31 +75,33 @@ export default function ElectronicsDetails() {
       breadcrumbTo="/electronics"
       badges={[
         { label: item.category, variant: 'neutral' },
-        ...(discount > 0 ? [{ label: `${discount}% OFF`, variant: 'danger', icon: TagIcon }] : []),
-        ...(item.verified ? [{ label: 'Verified Seller', variant: 'info', icon: BadgeCheck }] : []),
       ]}
       specs={[
         { label: 'Brand', value: item.brand, icon: Package },
         { label: 'Category', value: item.category },
-        { label: 'Condition', value: item.condition === 'new' ? 'New (Sealed)' : 'Used', icon: ShieldCheck },
-        { label: 'Warranty', value: '1 Year Brand Warranty' },
-      ]}
-      description={`Brand new ${item.title}, backed by manufacturer warranty and sold by an authorized SwipeDeals electronics dealer. Enjoy secure payment and doorstep delivery on every order.`}
+        { label: 'Condition', value: raw.condition === 'NEW' ? 'New (Sealed)' : 'Used', icon: ShieldCheck },
+        { label: 'Purchase Year', value: raw.purchaseYear },
+        { label: 'Warranty', value: raw.warrantyAvailable ? 'Available' : null },
+        { label: 'Original Box', value: raw.boxAvailable ? 'Included' : null },
+      ].filter((s) => s.value !== null && s.value !== undefined && s.value !== '')}
+      description={
+        raw.description ||
+        `${item.title}, listed on the SwipeDeals marketplace. Contact the seller directly to confirm condition, warranty status and delivery options.`
+      }
       priceBlock={
         <div>
-          <div className="flex items-center gap-2">
-            <p className="text-3xl font-extrabold text-text">{formatCurrencyFull(item.price)}</p>
-            {item.originalPrice && <p className="text-sm text-text-light line-through">{formatCurrencyFull(item.originalPrice)}</p>}
-          </div>
-          {discount > 0 && <p className="mt-1 text-sm font-semibold text-success">You save {discount}%</p>}
+          <p className="text-3xl font-extrabold text-text">{formatCurrencyFull(item.price)}</p>
+          {raw.negotiable && <p className="mt-1 text-sm text-text-secondary">Price negotiable</p>}
         </div>
       }
       similar={
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {similar.map((e, i) => (
-            <ElectronicsCard key={e.id} item={e} index={i} />
-          ))}
-        </div>
+        similar.length > 0 && (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {similar.map((e, i) => (
+              <ElectronicsCard key={e.id} item={e} index={i} />
+            ))}
+          </div>
+        )
       }
     />
   )

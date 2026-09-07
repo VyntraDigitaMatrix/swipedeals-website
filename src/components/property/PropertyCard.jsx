@@ -5,12 +5,15 @@ import WishlistButton from '../common/WishlistButton'
 import Rating from '../common/Rating'
 import Badge from '../common/Badge'
 import { useCompare } from '../../hooks/useCompare'
+import { usePublicImages } from '../../hooks/usePublicImages'
 import { getDealerById } from '../../data/dealers'
+import { propertyService } from '../../services/publicListingService'
 import { formatCurrency } from '../../utils/format'
 import { cn } from '../../utils/cn'
 
 export default function PropertyCard({ property, index = 0 }) {
   const dealer = getDealerById(property.dealerId)
+  const images = usePublicImages(propertyService.getImages, property.id, property.images)
   const { isComparing, toggleCompare } = useCompare()
   const comparing = isComparing(property.id)
 
@@ -24,7 +27,7 @@ export default function PropertyCard({ property, index = 0 }) {
     >
       <Link to={`/properties/${property.id}`} className="relative block aspect-[4/3] overflow-hidden bg-surface-alt">
         <img
-          src={property.images[0]}
+          src={images[0]}
           alt={property.title}
           loading="lazy"
           className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
@@ -47,11 +50,13 @@ export default function PropertyCard({ property, index = 0 }) {
         <Link to={`/properties/${property.id}`} className="mb-1 line-clamp-1 text-[15px] font-bold text-text hover:text-primary">
           {property.title}
         </Link>
-        <div className="mb-2 flex items-center gap-1.5 text-xs text-text-secondary">
-          <MapPin size={12} className="shrink-0" aria-hidden="true" />
-          <span className="line-clamp-1">{property.location}</span>
-        </div>
-        <Rating value={property.rating} size={12} />
+        {property.location && (
+          <div className="mb-2 flex items-center gap-1.5 text-xs text-text-secondary">
+            <MapPin size={12} className="shrink-0" aria-hidden="true" />
+            <span className="line-clamp-1">{property.location}</span>
+          </div>
+        )}
+        {property.rating != null && <Rating value={property.rating} size={12} />}
 
         <div className="my-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-text-secondary">
           {property.bedrooms > 0 && (
@@ -64,9 +69,11 @@ export default function PropertyCard({ property, index = 0 }) {
               <Bath size={13} aria-hidden="true" /> {property.bathrooms} Baths
             </span>
           )}
-          <span className="flex items-center gap-1">
-            <Ruler size={13} aria-hidden="true" /> {property.area} sqft
-          </span>
+          {property.area && (
+            <span className="flex items-center gap-1">
+              <Ruler size={13} aria-hidden="true" /> {property.area} sqft
+            </span>
+          )}
         </div>
 
         <div className="mt-auto flex items-end justify-between border-t border-border pt-3">

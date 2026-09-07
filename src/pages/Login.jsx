@@ -1,18 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { ArrowLeft, Info, Phone, RotateCw, ShieldCheck, User } from 'lucide-react'
+import { ArrowLeft, Phone, RotateCw, ShieldCheck, User } from 'lucide-react'
 import Input from '../components/forms/Input'
 import OtpInput from '../components/forms/OtpInput'
 import Button from '../components/buttons/Button'
 import { useAuth } from '../hooks/useAuth'
 import { useLocalStorage } from '../hooks/useLocalStorage'
-import { DEMO_PHONE, DEMO_OTP, DEMO_PROFILE } from '../utils/demoAuth'
+import { authService } from '../services/authService'
 
 const RESEND_SECONDS = 30
 
+// Reads a backend ApiResponse error's message, falling back to a generic
+// one when the request never reached the server at all (offline, CORS, etc.).
+function extractErrorMessage(err, fallback) {
+  return err?.response?.data?.message || fallback
+}
+
 export default function Login() {
-  const [step, setStep] = useState('phone') // 'phone' | 'otp' | 'name'
+  const [step, setStep] = useState('phone') // 'phone' | 'name' | 'otp'
+  const [mode, setMode] = useState('login') // 'login' | 'register' — which OTP flow is active
   const [phone, setPhone] = useState('')
   const [otp, setOtp] = useState('')
   const [name, setName] = useState('')
@@ -20,21 +27,12 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [resendIn, setResendIn] = useState(RESEND_SECONDS)
   const [knownUsers, setKnownUsers] = useLocalStorage('swipedeals_known_users', {})
-  const seeded = useRef(false)
+  const otpStartedRef = useRef(false)
 
   const { login } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const redirectTo = searchParams.get('redirect') || '/'
-
-  // Seed the demo account once so it's ready to sign in with no extra steps.
-  useEffect(() => {
-    if (seeded.current) return
-    seeded.current = true
-    if (!knownUsers[DEMO_PHONE]) {
-      setKnownUsers((prev) => ({ ...prev, [DEMO_PHONE]: { name: DEMO_PROFILE.name, email: DEMO_PROFILE.email } }))
-    }
-  }, [knownUsers, setKnownUsers])
 
   useEffect(() => {
     if (step !== 'otp' || resendIn <= 0) return
@@ -42,7 +40,9 @@ export default function Login() {
     return () => clearTimeout(t)
   }, [step, resendIn])
 
-  const handleSendOtp = (e) => {
+  // Step 1: mobile number. Tries the login OTP endpoint first — a 404 means
+  // this number has no account yet, so we collect a name and register instead.
+  const handleSendOtp = async (e) => {
     e.preventDefault()
     if (!/^[6-9]\d{9}$/.test(phone)) {
       setError('Enter a valid 10-digit mobile number.')
@@ -50,50 +50,96 @@ export default function Login() {
     }
     setError('')
     setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
+    try {
+      await authService.requestLoginOtp(phone)
+      setMode('login')
       setOtp('')
       setResendIn(RESEND_SECONDS)
       setStep('otp')
-    }, 600)
+    } catch (err) {
+      if (err.response?.status === 404) {
+        // No account for this number yet — collect a name, then register.
+        setStep('name')
+      } else {
+        setError(extractErrorMessage(err, 'Could not send OTP. Please try again.'))
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handleResend = () => {
-    if (resendIn > 0) return
-    setOtp('')
-    setResendIn(RESEND_SECONDS)
-  }
-
-  const handleVerifyOtp = (e) => {
-    e.preventDefault()
-    if (otp.length < 6) {
-      setError('Enter the 6-digit OTP.')
-      return
-    }
-    if (otp !== DEMO_OTP) {
-      setError(`Incorrect OTP. Use ${DEMO_OTP} for this demo.`)
-      return
-    }
-    setError('')
-    const existing = knownUsers[phone]
-    if (existing) {
-      login({ name: existing.name, phone, email: existing.email || null })
-      navigate(redirectTo)
-      return
-    }
-    setStep('name')
-  }
-
-  const handleCompleteSignup = (e) => {
+  // New-user step: collect a full name, then request a registration OTP.
+  const handleStartRegistration = async (e) => {
     e.preventDefault()
     if (!name.trim()) {
       setError('Please enter your name.')
       return
     }
     setError('')
-    setKnownUsers((prev) => ({ ...prev, [phone]: { name: name.trim(), email: null } }))
-    login({ name: name.trim(), phone, email: null })
-    navigate(redirectTo)
+    setLoading(true)
+    try {
+      await authService.requestRegistrationOtp(name.trim(), phone)
+      setMode('register')
+      setOtp('')
+      setResendIn(RESEND_SECONDS)
+      setStep('otp')
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Could not send OTP. Please try again.'))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResend = async () => {
+    if (resendIn > 0) return
+    setError('')
+    try {
+      if (mode === 'register') {
+        await authService.resendRegistrationOtp(phone)
+      } else {
+        await authService.resendLoginOtp(phone)
+      }
+      setOtp('')
+      setResendIn(RESEND_SECONDS)
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Could not resend OTP. Please try again.'))
+    }
+  }
+
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault()
+    if (otp.length < 6) {
+      setError('Enter the 6-digit OTP.')
+      return
+    }
+    setError('')
+    setLoading(true)
+    try {
+      const response =
+        mode === 'register'
+          ? await authService.verifyRegistrationOtp(phone, otp)
+          : await authService.verifyLoginOtp(phone, otp)
+
+      const tokens = response?.data
+      if (!tokens?.accessToken) {
+        throw new Error('Sign-in did not return an access token.')
+      }
+      authService.setTokens(tokens)
+
+      // The backend doesn't return a profile — remember the name locally
+      // (from registration, or from a previous sign-in on this browser) so
+      // the navbar has something better than a bare phone number to show.
+      const displayName = mode === 'register' ? name.trim() : knownUsers[phone]?.name
+      setKnownUsers((prev) => ({ ...prev, [phone]: { name: displayName || prev[phone]?.name || null } }))
+      login({ name: displayName || `+91 ${phone}`, phone, email: null })
+
+      navigate(redirectTo)
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Incorrect or expired OTP. Please try again.'))
+    } finally {
+      setLoading(false)
+      otpStartedRef.current = false
+    }
   }
 
   return (
@@ -129,14 +175,6 @@ export default function Login() {
               <h1 className="text-2xl font-extrabold text-text">Log in or sign up</h1>
               <p className="mt-2 text-sm text-text-secondary">We&rsquo;ll text you a one-time password to verify it&rsquo;s you.</p>
 
-              <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-info/30 bg-info/5 p-3.5 text-xs text-text-secondary">
-                <Info size={15} className="mt-0.5 shrink-0 text-info" aria-hidden="true" />
-                <span>
-                  Demo credentials — Mobile <span className="font-semibold text-text">{DEMO_PHONE}</span>, OTP{' '}
-                  <span className="font-semibold text-text">{DEMO_OTP}</span>
-                </span>
-              </div>
-
               <form className="mt-5 space-y-4" onSubmit={handleSendOtp}>
                 <Input
                   label="Mobile number"
@@ -158,7 +196,7 @@ export default function Login() {
             </>
           )}
 
-          {step === 'otp' && (
+          {step === 'name' && (
             <>
               <button
                 type="button"
@@ -169,6 +207,39 @@ export default function Login() {
                 Change number
               </button>
 
+              <h1 className="text-2xl font-extrabold text-text">What should we call you?</h1>
+              <p className="mt-2 text-sm text-text-secondary">
+                We couldn&rsquo;t find an account for <span className="font-semibold text-text">+91 {phone}</span> — let&rsquo;s create one.
+              </p>
+
+              <form className="mt-6 space-y-4" onSubmit={handleStartRegistration}>
+                <Input
+                  label="Full name"
+                  icon={User}
+                  placeholder="e.g. Aditya Kapoor"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  error={error}
+                  required
+                />
+                <Button type="submit" variant="primary" fullWidth size="lg" loading={loading}>
+                  Send OTP
+                </Button>
+              </form>
+            </>
+          )}
+
+          {step === 'otp' && (
+            <>
+              <button
+                type="button"
+                onClick={() => { setStep(mode === 'register' ? 'name' : 'phone'); setError('') }}
+                className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-text-secondary hover:text-primary"
+              >
+                <ArrowLeft size={15} aria-hidden="true" />
+                {mode === 'register' ? 'Back' : 'Change number'}
+              </button>
+
               <h1 className="text-2xl font-extrabold text-text">Verify your number</h1>
               <p className="mt-2 text-sm text-text-secondary">
                 Enter the 6-digit OTP sent to <span className="font-semibold text-text">+91 {phone}</span>
@@ -177,7 +248,7 @@ export default function Login() {
               <form className="mt-6 space-y-5" onSubmit={handleVerifyOtp}>
                 <OtpInput value={otp} onChange={setOtp} error={error} />
 
-                <Button type="submit" variant="primary" fullWidth size="lg">
+                <Button type="submit" variant="primary" fullWidth size="lg" loading={loading}>
                   Verify &amp; Continue
                 </Button>
 
@@ -195,28 +266,6 @@ export default function Login() {
                     </button>
                   )}
                 </div>
-              </form>
-            </>
-          )}
-
-          {step === 'name' && (
-            <>
-              <h1 className="text-2xl font-extrabold text-text">What should we call you?</h1>
-              <p className="mt-2 text-sm text-text-secondary">Just this once — we&rsquo;ll remember you next time you log in.</p>
-
-              <form className="mt-6 space-y-4" onSubmit={handleCompleteSignup}>
-                <Input
-                  label="Full name"
-                  icon={User}
-                  placeholder="e.g. Aditya Kapoor"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  error={error}
-                  required
-                />
-                <Button type="submit" variant="primary" fullWidth size="lg">
-                  Continue to SwipeDeals
-                </Button>
               </form>
             </>
           )}

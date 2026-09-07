@@ -35,7 +35,6 @@ import { useKyc } from '../../hooks/useKyc'
 import { useOnClickOutside } from '../../hooks/useOnClickOutside'
 import navLinks from './navLinks'
 import { cn } from '../../utils/cn'
-import { DEMO_PROFILE } from '../../utils/demoAuth'
 
 const CITIES = ['Mumbai', 'Delhi NCR', 'Bangalore', 'Pune', 'Hyderabad', 'Chennai', 'Ahmedabad', 'Kolkata']
 
@@ -98,17 +97,12 @@ export default function Navbar() {
   const navigate = useNavigate()
   const scrolled = useScrollPosition(20)
   const { count } = useWishlist()
-  const { user, isAuthenticated, login, logout } = useAuth()
+  const { user, isAuthenticated, logout } = useAuth()
 
   const [query, setQuery] = useState('')
   const handleSearch = (e) => {
     e.preventDefault()
     if (query.trim()) navigate(`/cars?q=${encodeURIComponent(query.trim())}`)
-  }
-
-  const handleDemoDashboard = () => {
-    login(DEMO_PROFILE)
-    navigate('/dashboard')
   }
 
   return (
@@ -474,15 +468,9 @@ function IconLink({ to, label, children, badge }) {
 
 function MobileMenu({ open, onClose }) {
   const [openDropdown, setOpenDropdown] = useState(null)
-  const { user, isAuthenticated, login, logout } = useAuth()
+  const { user, isAuthenticated, logout } = useAuth()
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
-
-  const handleDemoDashboard = () => {
-    login(DEMO_PROFILE)
-    onClose()
-    navigate('/dashboard')
-  }
 
   const handleLogout = () => {
     logout()
