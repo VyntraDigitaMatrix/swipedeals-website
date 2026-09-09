@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Calendar, Fuel, Gauge, Palette, Settings2, Users } from 'lucide-react'
+import { Calendar, FileText, Fuel, Gauge, Hash, Palette, Settings2, Shield, Users } from 'lucide-react'
 import DetailLayout from '../components/listing/DetailLayout'
 import Carousel from '../components/common/Carousel'
 import VehicleCard from '../components/vehicle/VehicleCard'
@@ -70,8 +70,7 @@ export default function CarDetails() {
   const car = { ...mapVehicleToCarCard(raw), images, location: '', color: raw.color }
   const similar = similarRaw.map(mapVehicleToCarCard)
 
-  // Every row here comes straight from the backend's VehicleResponse — no
-  // fabricated specs, features or inspection data.
+  // Specs strictly mapped from user-vehicle-listing-controller fields
   const specItems = [
     { label: 'Year', value: car.year, icon: Calendar },
     { label: 'Odometer', value: car.km != null ? `${car.km.toLocaleString('en-IN')} km` : null, icon: Gauge },
@@ -79,6 +78,9 @@ export default function CarDetails() {
     { label: 'Transmission', value: car.transmission, icon: Settings2 },
     { label: 'Owners', value: car.owners ? `${car.owners} Owner${car.owners > 1 ? 's' : ''}` : 'First Owner', icon: Users },
     { label: 'Colour', value: car.color, icon: Palette },
+    { label: 'Reg. Number', value: raw.registrationNumber, icon: FileText },
+    { label: 'Chassis No.', value: raw.chassisNumber, icon: Shield },
+    { label: 'VIN', value: raw.vin, icon: Hash },
   ].filter((s) => s.value !== null && s.value !== undefined && s.value !== '')
 
   return (
@@ -92,8 +94,7 @@ export default function CarDetails() {
       specs={specItems}
       description={
         raw.description ||
-        `This ${car.year} ${car.title} is listed on the SwipeDeals marketplace${
-          car.km != null ? ` with ${car.km.toLocaleString('en-IN')} km on the odometer` : ''
+        `This ${car.year} ${car.title} is listed on the SwipeDeals marketplace${car.km != null ? ` with ${car.km.toLocaleString('en-IN')} km on the odometer` : ''
         }. Contact the seller directly for a closer look, full documentation and a test drive.`
       }
       priceBlock={

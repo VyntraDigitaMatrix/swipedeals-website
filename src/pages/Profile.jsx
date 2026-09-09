@@ -56,14 +56,14 @@ export default function Profile() {
           <div className="flex flex-col items-center border-b border-border pb-5 text-center">
             <div className="relative">
               <span className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-primary text-2xl font-black text-white">
-                {user.name.charAt(0).toUpperCase()}
+                {(user?.name || user?.phone || 'U').charAt(0).toUpperCase()}
               </span>
               <button type="button" aria-label="Change photo" className="absolute bottom-0 right-0 rounded-full bg-primary p-1.5 text-white shadow-soft">
                 <Camera size={12} aria-hidden="true" />
               </button>
             </div>
-            <p className="mt-3 font-bold text-text">{user.name}</p>
-            <p className="text-xs text-text-secondary">{user.email || (user.phone && `+91 ${user.phone}`)}</p>
+            <p className="mt-3 font-bold text-text">{user?.name || (user?.phone ? `+91 ${user.phone}` : 'Account')}</p>
+            <p className="text-xs text-text-secondary">{user?.email || (user?.phone && `+91 ${user.phone}`)}</p>
           </div>
 
           <nav className="mt-4 flex flex-col gap-1">
@@ -97,7 +97,7 @@ export default function Profile() {
             <div>
               <h2 className="mb-6 text-lg font-bold text-text">Profile Information</h2>
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <Input label="Full Name" icon={User} defaultValue={user.name} />
+                <Input label="Full Name" icon={User} defaultValue={user?.name || ''} />
                 <Input
                   label="Mobile Number"
                   icon={Phone}

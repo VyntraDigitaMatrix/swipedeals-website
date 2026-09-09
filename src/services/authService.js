@@ -1,68 +1,91 @@
 import api from '../api/axios'
 
 /**
- * Real backend-backed user authentication — mobile + OTP, matching
- * UserAuthController exactly (/api/user/auth/**). All of these endpoints
- * are public/unauthenticated on the backend; only /logout requires the
- * bearer token this service already attaches via api/axios.js.
- *
- * Registration is two steps: request() sends an OTP to a brand-new mobile
- * number (fullName + mobileNumber), verify() creates the account and
- * returns tokens. Login is the same two-step shape for an existing number.
+ * User Authentication service matching UserAuthController endpoints exactly (/api/user/auth/**).
  */
-
 const BASE_URL = '/api/user/auth'
 
 const ACCESS_TOKEN_KEY = 'swipedeals_access_token'
 const REFRESH_TOKEN_KEY = 'swipedeals_refresh_token'
 
 export const authService = {
-  // Step 1 of registration: sends an OTP to a new mobile number.
+  /**
+   * POST /api/user/auth/register
+   * Body: { fullName: string, mobileNumber: string }
+   */
   requestRegistrationOtp: async (fullName, mobileNumber) => {
     const response = await api.post(`${BASE_URL}/register`, { fullName, mobileNumber })
     return response.data
   },
 
-  // Step 2 of registration: verifies the OTP and creates the account.
-  // Returns { accessToken, refreshToken, tokenType }.
+  /**
+   * POST /api/user/auth/register/verify-otp
+   * Body: { mobileNumber: string, otp: string }
+   * Returns data: { accessToken, refreshToken, tokenType }
+   */
   verifyRegistrationOtp: async (mobileNumber, otp) => {
     const response = await api.post(`${BASE_URL}/register/verify-otp`, { mobileNumber, otp })
     return response.data
   },
 
+  /**
+   * POST /api/user/auth/register/resend-otp
+   * Body: { mobileNumber: string }
+   */
   resendRegistrationOtp: async (mobileNumber) => {
     const response = await api.post(`${BASE_URL}/register/resend-otp`, { mobileNumber })
     return response.data
   },
 
-  // Step 1 of login: sends an OTP to an existing mobile number. Rejects
-  // with a 404 if no account exists for that number.
+  /**
+   * POST /api/user/auth/login
+   * Body: { mobileNumber: string }
+   */
   requestLoginOtp: async (mobileNumber) => {
     const response = await api.post(`${BASE_URL}/login`, { mobileNumber })
     return response.data
   },
 
-  // Step 2 of login: verifies the OTP. Returns { accessToken, refreshToken, tokenType }.
+  /**
+   * POST /api/user/auth/login/verify-otp
+   * Body: { mobileNumber: string, otp: string }
+   * Returns data: { accessToken, refreshToken, tokenType }
+   */
   verifyLoginOtp: async (mobileNumber, otp) => {
     const response = await api.post(`${BASE_URL}/login/verify-otp`, { mobileNumber, otp })
     return response.data
   },
 
+  /**
+   * POST /api/user/auth/login/resend-otp
+   * Body: { mobileNumber: string }
+   */
   resendLoginOtp: async (mobileNumber) => {
     const response = await api.post(`${BASE_URL}/login/resend-otp`, { mobileNumber })
     return response.data
   },
 
-  // Best-effort server-side token revocation. Callers should clear local
-  // session state regardless of whether this succeeds.
+  /**
+   * POST /api/user/auth/refresh-token
+   * Body: { refreshToken: string }
+   */
+  refreshToken: async (refreshToken) => {
+    const response = await api.post(`${BASE_URL}/refresh-token`, { refreshToken })
+    return response.data
+  },
+
+  /**
+   * POST /api/user/auth/logout
+   * Body: { refreshToken: string }
+   */
   logout: async (refreshToken) => {
     const response = await api.post(`${BASE_URL}/logout`, { refreshToken })
     return response.data
   },
 
   setTokens: ({ accessToken, refreshToken }) => {
-    localStorage.setItem(ACCESS_TOKEN_KEY, accessToken)
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken)
+    if (accessToken) localStorage.setItem(ACCESS_TOKEN_KEY, accessToken)
+    if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken)
   },
 
   clearTokens: () => {

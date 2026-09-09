@@ -15,6 +15,7 @@ import { useKyc } from '../hooks/useKyc'
 import { useListingsStore } from '../hooks/useListingsStore'
 import { cn } from '../utils/cn'
 import { formatCurrencyFull } from '../utils/format'
+import { vehicleListingService, VEHICLE_BRANDS, VEHICLE_CONDITIONS, FUEL_TYPES, TRANSMISSION_TYPES } from '../services/vehicleListingService'
 
 // Electronics, Spare Parts & Properties each have their own dedicated
 // tabbed forms (with category-specific fields) — picking one of these here
@@ -40,7 +41,19 @@ const initialForm = (category, user) => ({
   images: [],
   title: '',
   description: '',
-  condition: 'used',
+  brand: 'MARUTI_SUZUKI',
+  model: '',
+  variant: '',
+  year: new Date().getFullYear(),
+  mileage: '',
+  condition: 'USED',
+  fuelType: 'PETROL',
+  transmissionType: 'MANUAL',
+  color: '',
+  registrationNumber: '',
+  chassisNumber: '',
+  vin: '',
+  ownersCount: '1',
   location: '',
   city: '',
   price: '',
@@ -67,14 +80,16 @@ export default function SellProduct() {
 
   const [activeTab, setActiveTab] = useState('photos')
   const [published, setPublished] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [apiError, setApiError] = useState(null)
   const [form, setForm] = useState(() => initialForm(preselectedCategory, user))
 
   const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
 
   const imagesValid = form.images.length > 0
-  const detailsValid = form.title.trim().length > 2 && form.description.trim().length > 5
+  const detailsValid = (form.title || form.model).trim().length >= 2
   const pricingValid = Number(form.price) > 0
-  const contactValid = form.sellerName.trim().length > 1 && /^\d{10}$/.test(form.sellerPhone) && form.location.trim().length > 2 && form.city.trim().length > 1
+  const contactValid = form.sellerName.trim().length > 1 && form.location.trim().length > 2 && form.city.trim().length > 1
   const canSubmit = imagesValid && detailsValid && pricingValid && contactValid
 
   const TABS = [
@@ -91,22 +106,68 @@ export default function SellProduct() {
     update('images', [...form.images, ...urls].slice(0, 8))
   }
 
-  const handlePublish = () => {
-    if (!canSubmit) return
-    addListing({
-      category: form.category,
-      sellerType: 'individual',
-      sellerName: form.sellerName,
-      sellerPhone: form.sellerPhone,
-      title: form.title,
-      description: form.description,
-      condition: form.condition,
-      location: form.location,
-      city: form.city,
-      price: Number(form.price),
-      images: form.images,
-    })
-    setPublished(true)
+  const handlePublish = async () => {
+    if (!canSubmit || submitting) return
+    setSubmitting(true)
+    setApiError(null)
+
+    const payload = {
+      brand: form.brand || 'MARUTI_SUZUKI',
+      model: form.model || form.title || 'Vehicle',
+      variant: form.variant || '',
+      year: parseInt(form.year, 10) || new Date().getFullYear(),
+      price: parseFloat(form.price) || 0,
+      mileage: parseInt(form.mileage, 10) || 0,
+      condition: form.condition || 'USED',
+      fuelType: form.fuelType || 'PETROL',
+      transmissionType: form.transmissionType || 'MANUAL',
+      color: form.color || '',
+      registrationNumber: form.registrationNumber || '',
+      chassisNumber: form.chassisNumber || '',
+      vin: form.vin || '',
+      vehicleType: form.category === 'commercial' ? 'TRUCK' : 'CAR',
+      ownersCount: parseInt(form.ownersCount, 10) || 1,
+      description: form.description || '',
+    }
+
+    try {
+      await vehicleListingService.createListing(payload)
+      addListing({
+        category: form.category,
+        sellerType: 'individual',
+        sellerName: form.sellerName,
+        sellerPhone: form.sellerPhone,
+        title: form.title || `${form.brand} ${form.model}`,
+        description: form.description,
+        condition: form.condition,
+        location: form.location,
+        city: form.city,
+        price: Number(form.price),
+        images: form.images,
+      })
+      setPublished(true)
+    } catch (err) {
+      console.warn('API vehicle creation warning/fallback:', err)
+      // Fallback to local store if backend unreachable, but show warning if actual API error
+      const errMsg = err?.response?.data?.message || err?.message || 'Server call failed, saved locally.'
+      setApiError(errMsg)
+      addListing({
+        category: form.category,
+        sellerType: 'individual',
+        sellerName: form.sellerName,
+        sellerPhone: form.sellerPhone,
+        title: form.title || `${form.brand} ${form.model}`,
+        description: form.description,
+        condition: form.condition,
+        location: form.location,
+        city: form.city,
+        price: Number(form.price),
+        images: form.images,
+      })
+      setPublished(true)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   if (published) {
@@ -280,15 +341,37 @@ export default function SellProduct() {
 
         {activeTab === 'details' && (
           <div className="space-y-5">
-            <h2 className="text-lg font-bold text-text">Product details</h2>
-            <Input label="Title" placeholder="e.g. Hyundai Creta SX(O) Turbo 2023" value={form.title} onChange={(e) => update('title', e.target.value)} />
-            <TextArea label="Description" placeholder="Describe the condition, features and history..." value={form.description} onChange={(e) => update('description', e.target.value)} />
+            <h2 className="text-lg font-bold text-text">Vehicle &amp; Product details</h2>
             <Dropdown
-              label="Condition"
-              value={form.condition}
-              onChange={(v) => update('condition', v)}
-              options={[{ value: 'new', label: 'New' }, { value: 'used', label: 'Used' }]}
+              label="Brand / Make"
+              value={form.brand}
+              onChange={(v) => update('brand', v)}
+              options={VEHICLE_BRANDS}
             />
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Model" placeholder="e.g. Swift / Creta" value={form.model} onChange={(e) => update('model', e.target.value)} />
+              <Input label="Variant" placeholder="e.g. VXI / SX(O)" value={form.variant} onChange={(e) => update('variant', e.target.value)} />
+            </div>
+            <Input label="Title" placeholder="e.g. Maruti Suzuki Swift VXI 2023" value={form.title} onChange={(e) => update('title', e.target.value)} />
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Manufacturing Year" type="number" placeholder="2023" value={form.year} onChange={(e) => update('year', e.target.value)} />
+              <Input label="KM Driven / Odometer" type="number" placeholder="15000" value={form.mileage} onChange={(e) => update('mileage', e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Dropdown label="Fuel Type" value={form.fuelType} onChange={(v) => update('fuelType', v)} options={FUEL_TYPES} />
+              <Dropdown label="Transmission" value={form.transmissionType} onChange={(v) => update('transmissionType', v)} options={TRANSMISSION_TYPES} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Dropdown label="Condition" value={form.condition} onChange={(v) => update('condition', v)} options={VEHICLE_CONDITIONS} />
+              <Input label="Colour" placeholder="e.g. Pearl Arctic White" value={form.color} onChange={(e) => update('color', e.target.value)} />
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Input label="Reg. Number" placeholder="e.g. MH01AB1234" value={form.registrationNumber} onChange={(e) => update('registrationNumber', e.target.value)} />
+              <Input label="Chassis Number" placeholder="Chassis No." value={form.chassisNumber} onChange={(e) => update('chassisNumber', e.target.value)} />
+              <Input label="VIN" placeholder="VIN Number" value={form.vin} onChange={(e) => update('vin', e.target.value)} />
+            </div>
+            <Input label="Number of Owners" type="number" placeholder="1" value={form.ownersCount} onChange={(e) => update('ownersCount', e.target.value)} />
+            <TextArea label="Description" placeholder="Describe the condition, features and history..." value={form.description} onChange={(e) => update('description', e.target.value)} />
           </div>
         )}
 

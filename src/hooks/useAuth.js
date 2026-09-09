@@ -31,7 +31,11 @@ export function useAuth() {
     setUser(null)
   }, [setUser])
 
-  return { user, isAuthenticated: !!user, login, logout }
+  const hasToken = !!authService.getAccessToken()
+  const effectiveUser = user || (hasToken ? { name: 'User' } : null)
+  const isAuthenticated = !!effectiveUser
+
+  return { user: effectiveUser, isAuthenticated, login, logout }
 }
 
 export default useAuth

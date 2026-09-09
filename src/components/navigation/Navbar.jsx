@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   ShoppingBag,
   Sparkles,
+  Settings,
   Truck,
   User,
   Wrench,
@@ -56,6 +57,9 @@ const ITEM_ICONS = {
   'RC / Vehicle Details': ShieldCheck,
   'Car Finance': CreditCard,
   'Car Insurance': ShieldCheck,
+  'Electronics': Laptop,
+  'Spare Parts': Wrench,
+  'Services': Settings,
 }
 
 // Promo feature cards for desktop mega-dropdowns
@@ -75,14 +79,6 @@ const DROPDOWN_PROMOS = {
     cta: 'Explore Fleet',
     link: '/commercial-vehicles',
     bgGradient: 'from-slate-900 via-slate-800 to-slate-900',
-  },
-  Services: {
-    badge: 'Instant Utility',
-    title: 'Pay Traffic Fines & Check RC',
-    description: 'Check traffic challans and instant RC verification in 30 seconds.',
-    cta: 'Check Vehicle RC',
-    link: '/vehicle-info',
-    bgGradient: 'from-primary-dark via-primary-light to-primary',
   },
 }
 
@@ -244,7 +240,7 @@ function NavDropdown({ link }) {
   useOnClickOutside(ref, () => setOpen(false))
 
   const promo = DROPDOWN_PROMOS[link.label]
-  const alignRight = link.alignRight || link.label === 'Services'
+  const alignRight = link.alignRight || link.label === 'More'
 
   return (
     <div ref={ref} className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
@@ -274,7 +270,7 @@ function NavDropdown({ link }) {
             exit={{ opacity: 0, y: 6, scale: 0.98 }}
             transition={{ duration: 0.15 }}
             className={cn(
-              'absolute top-full z-50 mt-1 overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl p-3',
+              'absolute top-full z-50 mt-1 rounded-2xl border border-border bg-surface shadow-2xl p-3',
               alignRight ? 'right-0 left-auto origin-top-right' : 'left-0 origin-top-left',
               promo ? 'w-[520px] grid grid-cols-12 gap-3' : 'w-72'
             )}
@@ -282,6 +278,10 @@ function NavDropdown({ link }) {
             {/* Options List */}
             <div className={cn('space-y-1', promo ? 'col-span-7' : 'w-full')}>
               {link.dropdown.map((item) => {
+                if (item.dropdown) {
+                  return <NavSubDropdown key={item.label} item={item} setOpen={setOpen} />
+                }
+
                 const IconComponent = ITEM_ICONS[item.label] || Sparkles
                 return (
                   <Link
@@ -347,6 +347,9 @@ function UserMenu({ user, onLogout }) {
   useOnClickOutside(ref, () => setOpen(false))
   const { isKycVerified } = useKyc()
 
+  const displayName = user?.name || (user?.phone ? `+91 ${user.phone}` : 'Account')
+  const initial = displayName ? displayName.charAt(0).toUpperCase() : 'U'
+
   const menuItems = [
     { label: 'Profile', to: '/profile', icon: User },
     { label: 'Wishlist', to: '/wishlist', icon: Heart },
@@ -375,9 +378,9 @@ function UserMenu({ user, onLogout }) {
         )}
       >
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary-dark text-xs font-bold text-white shadow-lift">
-          {user.name.charAt(0).toUpperCase()}
+          {initial}
         </span>
-        <span className="hidden sm:inline text-xs font-bold text-text truncate max-w-[90px]">{user.name}</span>
+        <span className="hidden sm:inline text-xs font-bold text-text truncate max-w-[90px]">{displayName}</span>
         <ChevronDown size={13} className={cn('text-text-secondary transition-transform', open && 'rotate-180 text-primary')} aria-hidden="true" />
       </button>
 
@@ -393,11 +396,11 @@ function UserMenu({ user, onLogout }) {
             <div className="border-b border-border p-3 bg-surface-alt/50 rounded-xl mb-1">
               <div className="flex items-center gap-2.5">
                 <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary text-sm font-bold text-white">
-                  {user.name.charAt(0).toUpperCase()}
+                  {initial}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-bold text-text">{user.name}</p>
-                  <p className="truncate text-[11px] text-text-secondary">{user.email || (user.phone && `+91 ${user.phone}`)}</p>
+                  <p className="truncate text-xs font-bold text-text">{displayName}</p>
+                  <p className="truncate text-[11px] text-text-secondary">{user?.email || (user?.phone ? `+91 ${user.phone}` : '')}</p>
                 </div>
               </div>
               <div
@@ -544,11 +547,11 @@ function MobileMenu({ open, onClose }) {
                 className="mb-4 flex items-center gap-3 rounded-2xl border border-border bg-surface-alt p-3"
               >
                 <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary text-xs font-bold text-white">
-                  {user.name.charAt(0).toUpperCase()}
+                  {(user?.name || user?.phone || 'U').charAt(0).toUpperCase()}
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-bold text-text">{user.name}</p>
-                  <p className="truncate text-[11px] text-text-secondary">{user.email || user.phone}</p>
+                  <p className="truncate text-xs font-bold text-text">{user?.name || (user?.phone ? `+91 ${user.phone}` : 'Account')}</p>
+                  <p className="truncate text-[11px] text-text-secondary">{user?.email || user?.phone}</p>
                 </div>
               </Link>
             ) : null}
@@ -581,14 +584,18 @@ function MobileMenu({ open, onClose }) {
                           className="overflow-hidden pl-3"
                         >
                           {link.dropdown.map((item) => (
-                            <Link
-                              key={item.label}
-                              to={item.to}
-                              onClick={onClose}
-                              className="block rounded-lg px-3.5 py-2 text-xs font-medium text-text-secondary hover:bg-surface-alt hover:text-primary"
-                            >
-                              {item.label}
-                            </Link>
+                            item.dropdown ? (
+                              <MobileNestedDropdown key={item.label} item={item} onClose={onClose} />
+                            ) : (
+                              <Link
+                                key={item.label}
+                                to={item.to}
+                                onClick={onClose}
+                                className="block rounded-lg px-3.5 py-2 text-xs font-medium text-text-secondary hover:bg-surface-alt hover:text-primary"
+                              >
+                                {item.label}
+                              </Link>
+                            )
                           ))}
                         </motion.div>
                       )}
@@ -642,3 +649,107 @@ function MobileMenu({ open, onClose }) {
   )
 }
 
+function NavSubDropdown({ item, setOpen }) {
+  const [subOpen, setSubOpen] = useState(false)
+  const IconComponent = ITEM_ICONS[item.label] || Sparkles
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setSubOpen(true)}
+      onMouseLeave={() => setSubOpen(false)}
+    >
+      <Link
+        to={item.to}
+        onClick={() => setOpen(false)}
+        className="flex items-center justify-between rounded-xl p-2.5 transition-colors hover:bg-surface-alt group"
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors mt-0.5">
+            <IconComponent size={16} />
+          </div>
+          <p className="text-xs font-bold text-text group-hover:text-primary transition-colors">
+            {item.label}
+          </p>
+        </div>
+        <ChevronDown size={14} className={cn("-rotate-90 text-text-secondary transition-transform", subOpen && "text-primary")} />
+      </Link>
+
+      <AnimatePresence>
+        {subOpen && (
+          <motion.div
+            initial={{ opacity: 0, x: -6, scale: 0.98 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: -6, scale: 0.98 }}
+            transition={{ duration: 0.15 }}
+            className="absolute left-full top-0 z-50 ml-2 w-64 overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl p-2"
+          >
+            {item.dropdown.map((subItem) => {
+              const SubIcon = ITEM_ICONS[subItem.label] || Sparkles
+              return (
+                <Link
+                  key={subItem.label}
+                  to={subItem.to}
+                  onClick={() => setOpen(false)}
+                  className="flex items-start gap-3 rounded-xl p-2.5 transition-colors hover:bg-surface-alt group"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors mt-0.5">
+                    <SubIcon size={16} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-text group-hover:text-primary transition-colors">
+                      {subItem.label}
+                    </p>
+                    {subItem.description && (
+                      <p className="mt-0.5 text-[11px] leading-tight text-text-secondary line-clamp-1">
+                        {subItem.description}
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              )
+            })}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function MobileNestedDropdown({ item, onClose }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mb-1">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between rounded-lg px-3.5 py-2 text-xs font-medium text-text-secondary hover:bg-surface-alt hover:text-primary"
+      >
+        <span>{item.label}</span>
+        <ChevronDown size={14} className={cn('transition-transform', open && 'rotate-180')} />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden pl-4 border-l border-border/50 ml-3.5 mt-1 flex flex-col gap-1"
+          >
+            {item.dropdown.map((subItem) => (
+              <Link
+                key={subItem.label}
+                to={subItem.to}
+                onClick={onClose}
+                className="block rounded-lg py-1.5 px-2 text-[11px] font-medium text-text-secondary hover:text-primary hover:bg-surface-alt"
+              >
+                {subItem.label}
+              </Link>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}

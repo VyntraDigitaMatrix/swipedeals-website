@@ -22,6 +22,8 @@ import SellSparePart from './pages/SellSparePart'
 import SellElectronics from './pages/SellElectronics'
 import SellProperty from './pages/SellProperty'
 import Kyc from './pages/Kyc'
+import UserVerified from './pages/UserVerified'
+import UserActivation from './pages/UserActivation'
 import Dashboard from './pages/Dashboard'
 import Pricing from './pages/Pricing'
 import ListingDetails from './pages/ListingDetails'
@@ -74,6 +76,9 @@ function App() {
         <Route path="/sell/electronics" element={<SellElectronics />} />
         <Route path="/sell/properties" element={<SellProperty />} />
         <Route path="/kyc" element={<Kyc />} />
+        <Route path="/kyc/callback" element={<Kyc />} />
+        <Route path="/user-verified" element={<UserVerified />} />
+        <Route path="/user-activation" element={<UserActivation />} />
         <Route element={<PrivateRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
         </Route>

@@ -1,7 +1,7 @@
 import axios from 'axios'
 
 // Points at the same SwipeDeals backend the admin console talks to.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8082'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://swipedealsbackend.swipedeals.in'
 
 const ACCESS_TOKEN_KEY = 'swipedeals_access_token'
 const REFRESH_TOKEN_KEY = 'swipedeals_refresh_token'

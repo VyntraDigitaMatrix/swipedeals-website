@@ -1,10 +1,10 @@
 import { Link } from 'react-router-dom'
 import { Eye, X } from 'lucide-react'
-import Badge from '../common/Badge'
+import { cn } from '../../utils/cn'
 import { formatCurrencyFull } from '../../utils/format'
 
 /** Table of the buyer's saved (wishlisted) listings across every category. */
-export default function SavedListingsTable({ items, onRemove }) {
+export default function SavedListingsTable({ items, onRemove, categoryDot }) {
   if (!items.length) {
     return (
       <div className="rounded-2xl border border-dashed border-border bg-surface-alt/40 p-10 text-center">
@@ -27,7 +27,7 @@ export default function SavedListingsTable({ items, onRemove }) {
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.id} className="border-b border-border last:border-b-0 hover:bg-surface-alt/50">
+            <tr key={item.id} className="group border-b border-border last:border-b-0 hover:bg-surface-alt/50">
               <td className="p-4">
                 <div className="flex items-center gap-3">
                   <img src={item.images?.[0]} alt="" className="h-11 w-11 rounded-lg object-cover" />
@@ -35,11 +35,14 @@ export default function SavedListingsTable({ items, onRemove }) {
                 </div>
               </td>
               <td className="p-4">
-                <Badge variant="neutral">{item.categoryLabel}</Badge>
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-secondary">
+                  <span className={cn('h-1.5 w-1.5 rounded-full', categoryDot?.[item.category] || 'bg-primary')} aria-hidden="true" />
+                  {item.categoryLabel}
+                </span>
               </td>
-              <td className="p-4 font-semibold text-text">{formatCurrencyFull(item.price)}</td>
+              <td className="p-4 font-mono font-semibold tabular-nums text-text">{formatCurrencyFull(item.price)}</td>
               <td className="p-4">
-                <div className="flex items-center justify-end gap-1 text-text-secondary">
+                <div className="flex items-center justify-end gap-1 text-text-secondary opacity-70 transition-opacity group-hover:opacity-100">
                   <Link to={item.detailPath} aria-label="View listing" className="rounded-lg p-1.5 hover:bg-surface-alt hover:text-primary">
                     <Eye size={15} aria-hidden="true" />
                   </Link>
