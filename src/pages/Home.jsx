@@ -1,5 +1,16 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Building2, Crown, Home as HomeIcon, ShieldCheck, Sparkles, TreePine, Warehouse } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import {
+  ArrowRight,
+  Building2,
+  CarFront,
+  Crown,
+  Laptop,
+  Loader2,
+  Wrench,
+} from 'lucide-react'
+
 import Hero from '../components/hero/Hero'
 import CategoryGrid from '../components/hero/CategoryGrid'
 import VehicleServices from '../components/common/VehicleServices'
@@ -15,58 +26,58 @@ import VehicleCard from '../components/vehicle/VehicleCard'
 import CommercialVehicleCard from '../components/vehicle/CommercialVehicleCard'
 import ElectronicsCard from '../components/electronics/ElectronicsCard'
 import SparePartCard from '../components/cards/SparePartCard'
-import PropertySpotlight from '../components/property/PropertySpotlight'
-import PropertyRowCard from '../components/property/PropertyRowCard'
+import PropertyCard from '../components/property/PropertyCard'
 import MixedListingCard from '../components/cards/MixedListingCard'
 
-import { cars } from '../data/cars'
-import { commercialVehicles } from '../data/commercialVehicles'
-import { electronics } from '../data/electronics'
-import { properties } from '../data/properties'
-import { spareParts } from '../data/spareParts'
+import {
+  vehicleService,
+  electronicsService,
+  propertyService,
+  sparePartsService,
+  mapVehicleToCarCard,
+  mapVehicleToCommercialCard,
+  mapElectronicsToCard,
+  mapSparePartToCard,
+  mapPropertyToCard,
+} from '../services/publicListingService'
 import { useListingsStore } from '../hooks/useListingsStore'
+import { cn } from '../utils/cn'
 
-const CATEGORY_LABELS = { cars: 'Car', commercial: 'Commercial', electronics: 'Electronics', properties: 'Property', 'spare-parts': 'Spare Part' }
+const CATEGORY_LABELS = {
+  cars: 'Car',
+  commercial: 'Commercial',
+  electronics: 'Electronics',
+  properties: 'Property',
+  'spare-parts': 'Spare Part',
+}
 
-const featuredCars = cars.filter((c) => c.rating >= 4.6).slice(0, 8)
-const featuredElectronics = electronics.slice(0, 4)
-const featuredProperties = properties.slice(0, 5)
-const trendingParts = spareParts
-const commercialFeatured = commercialVehicles.slice(0, 6)
-
-const propertyTypeFilters = [
-  { label: 'Apartments', icon: Building2, type: 'Apartment' },
-  { label: 'Villas', icon: HomeIcon, type: 'Villa' },
-  { label: 'Plots', icon: TreePine, type: 'Plot' },
-  { label: 'Commercial', icon: Warehouse, type: 'Commercial' },
+// ── Category-tab browse section ─────────────────────────────────────────────
+const BROWSE_TABS = [
+  { id: 'vehicles',     label: 'Buy Vehicles',  icon: CarFront,   activeClass: 'bg-primary border-transparent text-white shadow-sm',        inactiveClass: 'border-border bg-surface text-text-secondary hover:bg-surface-alt' },
+  { id: 'properties',   label: 'Properties',    icon: Building2,  activeClass: 'bg-emerald-600 border-transparent text-white shadow-sm',    inactiveClass: 'border-border bg-surface text-text-secondary hover:bg-surface-alt' },
+  { id: 'spare-parts',  label: 'Spare Parts',   icon: Wrench,     activeClass: 'bg-amber-600 border-transparent text-white shadow-sm',      inactiveClass: 'border-border bg-surface text-text-secondary hover:bg-surface-alt' },
+  { id: 'electronics',  label: 'Electronics',   icon: Laptop,     activeClass: 'bg-purple-600 border-transparent text-white shadow-sm',     inactiveClass: 'border-border bg-surface text-text-secondary hover:bg-surface-alt' },
 ]
 
-const propertyTrustPoints = [
-  { icon: ShieldCheck, label: 'RERA Verified Listings' },
-  { icon: Sparkles, label: 'Zero Brokerage' },
-]
+function SectionLoader() {
+  return (
+    <div className="flex items-center justify-center py-16">
+      <Loader2 size={28} className="animate-spin text-primary" />
+    </div>
+  )
+}
 
-const latestListings = [
-  { ...cars[1], categoryLabel: 'Used Car', detailPath: `/cars/${cars[1].id}` },
-  { ...properties[2], categoryLabel: 'Property', detailPath: `/properties/${properties[2].id}` },
-  { ...electronics[3], categoryLabel: 'Electronics', detailPath: `/electronics/${electronics[3].id}` },
-  { ...cars[6], categoryLabel: 'New Car', detailPath: `/cars/${cars[6].id}` },
-  { ...commercialVehicles[3], categoryLabel: 'Commercial', detailPath: `/commercial-vehicles/${commercialVehicles[3].id}` },
-  { ...properties[7], categoryLabel: 'Property', detailPath: `/properties/${properties[7].id}` },
-  { ...electronics[6], categoryLabel: 'Electronics', detailPath: `/electronics/${electronics[6].id}` },
-  { ...spareParts[4], categoryLabel: 'Spare Part', detailPath: `/spare-parts/${spareParts[4].id}` },
-]
-
-const premiumListings = [
-  { ...cars[4], categoryLabel: 'Luxury Car', detailPath: `/cars/${cars[4].id}` },
-  { ...properties[6], categoryLabel: 'Penthouse', detailPath: `/properties/${properties[6].id}` },
-  { ...cars[8], categoryLabel: 'Luxury Car', detailPath: `/cars/${cars[8].id}` },
-  { ...properties[1], categoryLabel: 'Villa', detailPath: `/properties/${properties[1].id}` },
-  { ...cars[0], categoryLabel: 'Luxury Car', detailPath: `/cars/${cars[0].id}` },
-  { ...properties[3], categoryLabel: 'Commercial', detailPath: `/properties/${properties[3].id}` },
-]
+function EmptyState({ label, to }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-border bg-surface-alt py-12 text-center">
+      <p className="text-sm font-semibold text-text-secondary">No listings found yet</p>
+      <Link to={to} className="text-xs font-bold text-primary hover:underline">Browse {label} →</Link>
+    </div>
+  )
+}
 
 export default function Home() {
+  // Community listings (user-submitted)
   const { approved: approvedUserListings } = useListingsStore()
   const communityListings = approvedUserListings.slice(0, 8).map((l) => ({
     ...l,
@@ -75,12 +86,105 @@ export default function Home() {
     location: `${l.location}, ${l.city}`,
   }))
 
+  // API data state
+  const [vehicles,    setVehicles]    = useState([])
+  const [commercial,  setCommercial]  = useState([])
+  const [electronics, setElectronics] = useState([])
+  const [spareParts,  setSpareParts]  = useState([])
+  const [properties,  setProperties]  = useState([])
+
+  const [loadingVehicles,    setLoadingVehicles]    = useState(true)
+  const [loadingCommercial,  setLoadingCommercial]  = useState(true)
+  const [loadingElectronics, setLoadingElectronics] = useState(true)
+  const [loadingSpareParts,  setLoadingSpareParts]  = useState(true)
+  const [loadingProperties,  setLoadingProperties]  = useState(true)
+
+  // Browse-tab state
+  const [activeTab, setActiveTab] = useState('vehicles')
+
+  useEffect(() => {
+    let cancelled = false
+
+    // Cars (CAR type, newest first)
+    vehicleService.getAll({ type: 'CAR', size: 12, sort: 'createdAt,desc' })
+      .then((res) => {
+        if (cancelled) return
+        const content = res?.data?.content
+        setVehicles(Array.isArray(content) ? content.map(mapVehicleToCarCard) : [])
+      })
+      .catch(() => { if (!cancelled) setVehicles([]) })
+      .finally(() => { if (!cancelled) setLoadingVehicles(false) })
+
+    // Commercial vehicles (TRUCK type per CommercialVehicles.jsx)
+    vehicleService.getAll({ type: 'TRUCK', size: 6, sort: 'createdAt,desc' })
+      .then((res) => {
+        if (cancelled) return
+        const content = res?.data?.content
+        setCommercial(Array.isArray(content) ? content.map(mapVehicleToCommercialCard) : [])
+      })
+      .catch(() => { if (!cancelled) setCommercial([]) })
+      .finally(() => { if (!cancelled) setLoadingCommercial(false) })
+
+    // Electronics
+    electronicsService.getAll({ size: 8, sort: 'createdAt,desc' })
+      .then((res) => {
+        if (cancelled) return
+        const content = res?.data?.content
+        setElectronics(Array.isArray(content) ? content.map(mapElectronicsToCard) : [])
+      })
+      .catch(() => { if (!cancelled) setElectronics([]) })
+      .finally(() => { if (!cancelled) setLoadingElectronics(false) })
+
+    // Spare parts
+    sparePartsService.getAll({ size: 8, sort: 'createdAt,desc' })
+      .then((res) => {
+        if (cancelled) return
+        const content = res?.data?.content
+        setSpareParts(Array.isArray(content) ? content.map(mapSparePartToCard) : [])
+      })
+      .catch(() => { if (!cancelled) setSpareParts([]) })
+      .finally(() => { if (!cancelled) setLoadingSpareParts(false) })
+
+    // Properties
+    propertyService.getAll({ size: 8, sort: 'createdAt,desc' })
+      .then((res) => {
+        if (cancelled) return
+        const content = res?.data?.content
+        setProperties(Array.isArray(content) ? content.map(mapPropertyToCard) : [])
+      })
+      .catch(() => { if (!cancelled) setProperties([]) })
+      .finally(() => { if (!cancelled) setLoadingProperties(false) })
+
+    return () => { cancelled = true }
+  }, [])
+
+  const tabRoutes  = { vehicles: '/cars', properties: '/properties', 'spare-parts': '/spare-parts', electronics: '/electronics' }
+  const tabLabels  = { vehicles: 'All Vehicles', properties: 'All Properties', 'spare-parts': 'All Spare Parts', electronics: 'All Electronics' }
+
+  const browseLoading = {
+    vehicles:    loadingVehicles,
+    properties:  loadingProperties,
+    'spare-parts': loadingSpareParts,
+    electronics: loadingElectronics,
+  }
+
+  const browseData = {
+    vehicles:    vehicles,
+    properties:  properties,
+    'spare-parts': spareParts,
+    electronics: electronics,
+  }
+
+  const activeItems   = browseData[activeTab]   || []
+  const activeLoading = browseLoading[activeTab] ?? false
+
   return (
     <>
       <Hero />
       <CategoryGrid />
       <VehicleServices />
 
+      {/* ── Community Listings ──────────────────────────────────────── */}
       {communityListings.length > 0 && (
         <section className="bg-surface-alt/60 py-16 sm:py-20">
           <div className="container-page">
@@ -98,38 +202,149 @@ export default function Home() {
         </section>
       )}
 
-      <section className="container-page py-16 sm:py-20">
-        <SectionHeader
-          eyebrow="Featured"
-          title="Hand-picked cars for you"
-          description="Top-rated, verified used & new cars from trusted dealers near you."
-          action="View All Cars"
-          actionTo="/cars"
-        />
-        <Carousel>
-          {featuredCars.map((car, i) => (
-            <VehicleCard key={car.id} car={car} index={i} />
-          ))}
-        </Carousel>
+      {/* ── Browse All Categories (Tabbed) ──────────────────────────── */}
+      <section className="container-page py-12 sm:py-16">
+        {/* Header */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <span className="mb-1 inline-block text-[11px] font-bold uppercase tracking-widest text-primary">
+              Browse Now
+            </span>
+            <h2 className="text-2xl font-extrabold text-text sm:text-3xl">
+              Explore all categories
+            </h2>
+          </div>
+          <Link
+            to={tabRoutes[activeTab]}
+            className="flex w-fit items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-primary-dark"
+          >
+            {tabLabels[activeTab]}
+            <ArrowRight size={14} />
+          </Link>
+        </div>
+
+        {/* Tab Pills */}
+        <div className="mb-6 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+          {BROWSE_TABS.map((tab) => {
+            const active = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-bold transition-all duration-200',
+                  active ? tab.activeClass : tab.inactiveClass
+                )}
+              >
+                <tab.icon size={15} />
+                {tab.label}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Tab Content */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18 }}
+          >
+            {activeLoading ? (
+              <SectionLoader />
+            ) : activeItems.length === 0 ? (
+              <EmptyState label={tabLabels[activeTab]} to={tabRoutes[activeTab]} />
+            ) : (
+              <>
+                {activeTab === 'vehicles' && (
+                  <Carousel>
+                    {activeItems.map((car, i) => <VehicleCard key={car.id} car={car} index={i} />)}
+                  </Carousel>
+                )}
+                {activeTab === 'properties' && (
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                    {activeItems.map((p, i) => <PropertyCard key={p.id} property={p} index={i} />)}
+                  </div>
+                )}
+                {activeTab === 'spare-parts' && (
+                  <Carousel itemClassName="w-[240px] sm:w-[260px]">
+                    {activeItems.map((part, i) => <SparePartCard key={part.id} part={part} index={i} />)}
+                  </Carousel>
+                )}
+                {activeTab === 'electronics' && (
+                  <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+                    {activeItems.map((item, i) => <ElectronicsCard key={item.id} item={item} index={i} />)}
+                  </div>
+                )}
+              </>
+            )}
+          </motion.div>
+        </AnimatePresence>
+
+        {/* View All CTA */}
+        {!activeLoading && activeItems.length > 0 && (
+          <div className="mt-8 text-center">
+            <Link
+              to={tabRoutes[activeTab]}
+              className="inline-flex items-center gap-2 rounded-xl border border-primary/30 px-6 py-2.5 text-sm font-bold text-primary transition-all hover:bg-primary/5 hover:shadow-md"
+            >
+              View all {tabLabels[activeTab]}
+              <ArrowRight size={15} />
+            </Link>
+          </div>
+        )}
       </section>
 
+      {/* ── Featured Cars ───────────────────────────────────────────── */}
       <section className="bg-surface-alt/60 py-16 sm:py-20">
         <div className="container-page">
           <SectionHeader
-            eyebrow="Latest Tech"
-            title="Trending electronics"
-            description="Mobiles, laptops, gaming consoles and more from authorized resellers."
-            action="View All Electronics"
-            actionTo="/electronics"
+            eyebrow="Featured"
+            title="Hand-picked cars for you"
+            description="Top-rated, verified used & new cars from trusted dealers near you."
+            action="View All Cars"
+            actionTo="/cars"
           />
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {featuredElectronics.map((item, i) => (
-              <ElectronicsCard key={item.id} item={item} index={i} />
-            ))}
-          </div>
+          {loadingVehicles ? (
+            <SectionLoader />
+          ) : vehicles.length === 0 ? (
+            <EmptyState label="Cars" to="/cars" />
+          ) : (
+            <Carousel>
+              {vehicles.map((car, i) => (
+                <VehicleCard key={car.id} car={car} index={i} />
+              ))}
+            </Carousel>
+          )}
         </div>
       </section>
 
+      {/* ── Electronics ─────────────────────────────────────────────── */}
+      <section className="container-page py-16 sm:py-20">
+        <SectionHeader
+          eyebrow="Latest Tech"
+          title="Trending electronics"
+          description="Mobiles, laptops, gaming consoles and more from authorized resellers."
+          action="View All Electronics"
+          actionTo="/electronics"
+        />
+        {loadingElectronics ? (
+          <SectionLoader />
+        ) : electronics.length === 0 ? (
+          <EmptyState label="Electronics" to="/electronics" />
+        ) : (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {electronics.slice(0, 4).map((item, i) => (
+              <ElectronicsCard key={item.id} item={item} index={i} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── Properties ──────────────────────────────────────────────── */}
       <section className="relative overflow-hidden py-16 sm:py-20">
         <div className="pointer-events-none absolute -right-32 top-10 h-80 w-80 rounded-full bg-accent/15 blur-3xl" aria-hidden="true" />
         <div className="container-page relative">
@@ -140,47 +355,21 @@ export default function Home() {
             action="View All Properties"
             actionTo="/properties"
           />
-
-          <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap gap-2">
-              <Link
-                to="/properties"
-                className="flex items-center gap-1.5 rounded-full border border-primary bg-primary px-3.5 py-2 text-xs font-semibold text-white"
-              >
-                All Properties
-              </Link>
-              {propertyTypeFilters.map((f) => (
-                <Link
-                  key={f.type}
-                  to={`/properties?type=${encodeURIComponent(f.type)}`}
-                  className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3.5 py-2 text-xs font-semibold text-text-secondary transition-colors hover:border-primary/40 hover:text-primary"
-                >
-                  <f.icon size={13} aria-hidden="true" />
-                  {f.label}
-                </Link>
+          {loadingProperties ? (
+            <SectionLoader />
+          ) : properties.length === 0 ? (
+            <EmptyState label="Properties" to="/properties" />
+          ) : (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {properties.slice(0, 4).map((p, i) => (
+                <PropertyCard key={p.id} property={p} index={i} />
               ))}
             </div>
-            <div className="hidden items-center gap-5 sm:flex">
-              {propertyTrustPoints.map((point) => (
-                <span key={point.label} className="flex items-center gap-1.5 text-xs font-semibold text-text-secondary">
-                  <point.icon size={14} className="text-success" aria-hidden="true" />
-                  {point.label}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr] lg:items-stretch">
-            <PropertySpotlight property={featuredProperties[0]} />
-            <div className="flex flex-col gap-4">
-              {featuredProperties.slice(1, 5).map((property, i) => (
-                <PropertyRowCard key={property.id} property={property} index={i} />
-              ))}
-            </div>
-          </div>
+          )}
         </div>
       </section>
 
+      {/* ── Spare Parts ─────────────────────────────────────────────── */}
       <section className="bg-surface-alt/60 py-16 sm:py-20">
         <div className="container-page">
           <SectionHeader
@@ -190,14 +379,21 @@ export default function Home() {
             action="Shop Spare Parts"
             actionTo="/spare-parts"
           />
-          <Carousel itemClassName="w-[240px] sm:w-[260px]">
-            {trendingParts.map((part, i) => (
-              <SparePartCard key={part.id} part={part} index={i} />
-            ))}
-          </Carousel>
+          {loadingSpareParts ? (
+            <SectionLoader />
+          ) : spareParts.length === 0 ? (
+            <EmptyState label="Spare Parts" to="/spare-parts" />
+          ) : (
+            <Carousel itemClassName="w-[240px] sm:w-[260px]">
+              {spareParts.map((part, i) => (
+                <SparePartCard key={part.id} part={part} index={i} />
+              ))}
+            </Carousel>
+          )}
         </div>
       </section>
 
+      {/* ── Commercial Vehicles ─────────────────────────────────────── */}
       <section className="container-page py-16 sm:py-20">
         <SectionHeader
           eyebrow="Fleet & Industrial"
@@ -206,24 +402,22 @@ export default function Home() {
           action="View All Commercial"
           actionTo="/commercial-vehicles"
         />
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {commercialFeatured.map((vehicle, i) => (
-            <CommercialVehicleCard key={vehicle.id} vehicle={vehicle} index={i} />
-          ))}
-        </div>
+        {loadingCommercial ? (
+          <SectionLoader />
+        ) : commercial.length === 0 ? (
+          <EmptyState label="Commercial Vehicles" to="/commercial-vehicles" />
+        ) : (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {commercial.map((vehicle, i) => (
+              <CommercialVehicleCard key={vehicle.id} vehicle={vehicle} index={i} />
+            ))}
+          </div>
+        )}
       </section>
 
       <BrandsMarquee />
 
-      <section className="container-page py-16 sm:py-20">
-        <SectionHeader eyebrow="Fresh Off the Market" title="Latest listings" description="Newly added across every category — updated daily." />
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {latestListings.map((item, i) => (
-            <MixedListingCard key={item.id} item={item} index={i} />
-          ))}
-        </div>
-      </section>
-
+      {/* ── Premium Section ─────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-text py-16 sm:py-20">
         <div className="pointer-events-none absolute -left-20 top-0 h-72 w-72 rounded-full bg-primary/30 blur-3xl" aria-hidden="true" />
         <div className="container-page relative">
@@ -237,12 +431,31 @@ export default function Home() {
                 Curated luxury cars, villas and penthouses for buyers who expect nothing but the best.
               </p>
             </div>
+            <Link to="/cars" className="flex w-fit items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-white/20">
+              View All <ArrowRight size={13} />
+            </Link>
           </div>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {premiumListings.map((item, i) => (
-              <MixedListingCard key={item.id} item={item} index={i} />
-            ))}
-          </div>
+          {loadingVehicles && loadingProperties ? (
+            <SectionLoader />
+          ) : (
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {[
+                ...vehicles.slice(0, 3).map((v) => ({
+                  ...v,
+                  categoryLabel: 'Featured Vehicle',
+                  detailPath: `/cars/${v.id}`,
+                  location: v.location || 'India',
+                })),
+                ...properties.slice(0, 3).map((p) => ({
+                  ...p,
+                  categoryLabel: p.purpose ? `${p.purpose} · ${p.type || 'Property'}` : 'Property',
+                  detailPath: `/properties/${p.id}`,
+                })),
+              ].map((item, i) => (
+                <MixedListingCard key={item.id} item={item} index={i} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

@@ -6,6 +6,7 @@ import Footer from '../footer/Footer'
 import FloatingActionButton from '../buttons/FloatingActionButton'
 import CompareBar from '../common/CompareBar'
 import ScrollToTop from './ScrollToTop'
+import MobileBottomNav from '../navigation/MobileBottomNav'
 
 export default function Layout() {
   return (
@@ -14,12 +15,13 @@ export default function Layout() {
       <TopBar />
       <Navbar />
       <SubBar />
-      <main className="flex-1">
+      <main className="flex-1 pb-16 xl:pb-0">
         <Outlet />
       </main>
       <Footer />
       <FloatingActionButton />
       <CompareBar />
+      <MobileBottomNav />
     </div>
   )
 }

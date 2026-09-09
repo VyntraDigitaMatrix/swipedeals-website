@@ -50,7 +50,7 @@ export default function SubBar() {
   }
 
   return (
-    <div className="sticky top-[72px] z-40 border-b border-border bg-surface-alt/95 backdrop-blur-md shadow-sm select-none">
+    <div className="sticky top-16 z-40 border-b border-border bg-surface-alt/95 backdrop-blur-md shadow-sm select-none">
       <div className="container-page flex flex-col md:flex-row items-center justify-between gap-3 py-2">
         {/* Prominent Search Bar with Category Selector */}
         <form onSubmit={handleSearch} className="flex w-full md:w-auto items-center flex-1 max-w-2xl">

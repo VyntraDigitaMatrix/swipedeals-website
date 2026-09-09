@@ -104,11 +104,11 @@ export default function Navbar() {
   return (
     <header
       className={cn(
-        'sticky top-0 z-50 border-b border-border bg-surface/95 backdrop-blur-xl transition-all duration-300',
-        scrolled ? 'shadow-card bg-surface/98 py-0' : 'py-0'
+        'sticky top-0 z-50 border-b border-border bg-surface transition-all duration-300',
+        scrolled ? 'shadow-card bg-surface py-0' : 'py-0'
       )}
     >
-      <div className="container-page flex h-18 items-center justify-between gap-4">
+      <div className="container-page flex h-16 items-center justify-between gap-4">
         {/* Brand Logo & Location Selector */}
         <div className="flex items-center gap-3 md:gap-4">
           <Link to="/" className="flex shrink-0 items-center gap-2.5 group select-none" aria-label="SwipeDeals home">
@@ -229,7 +229,12 @@ export default function Navbar() {
         </div>
       </div>
 
-      <MobileMenu open={mobileOpen} onClose={() => setMobileOpen(false)} />
+      <MobileMenu
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        selectedCity={selectedCity}
+        setSelectedCity={setSelectedCity}
+      />
     </header>
   )
 }
@@ -469,11 +474,12 @@ function IconLink({ to, label, children, badge }) {
   )
 }
 
-function MobileMenu({ open, onClose }) {
-  const [openDropdown, setOpenDropdown] = useState(null)
+function MobileMenu({ open, onClose, selectedCity, setSelectedCity }) {
+  const [openDropdown, setOpenDropdown] = useState('Cars')
   const { user, isAuthenticated, logout } = useAuth()
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
+  const [showCityPicker, setShowCityPicker] = useState(false)
 
   const handleLogout = () => {
     logout()
@@ -492,88 +498,124 @@ function MobileMenu({ open, onClose }) {
   return (
     <AnimatePresence>
       {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm xl:hidden"
-          />
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', stiffness: 320, damping: 34 }}
-            className="fixed inset-y-0 right-0 z-50 flex w-[85%] max-w-sm flex-col overflow-y-auto bg-surface p-5 shadow-2xl xl:hidden"
-          >
-            {/* Header */}
-            <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
-              <Link to="/" onClick={onClose} className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-secondary text-white font-bold">
-                  <CarFront size={20} />
-                </div>
-                <span className="text-lg font-black text-text">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 z-[100] flex w-full h-full min-h-screen flex-col overflow-y-auto bg-surface p-4 sm:p-6 xl:hidden"
+        >
+          {/* Header Bar inside Full Screen Mobile View */}
+          <div className="mb-4 flex items-center justify-between border-b border-border pb-4">
+            <Link to="/" onClick={onClose} className="flex items-center gap-2.5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary via-primary-light to-secondary text-white font-bold shadow-md">
+                <CarFront size={22} />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-xl font-black text-text leading-none">
                   Swipe<span className="text-primary">Deals</span>
                 </span>
-              </Link>
+                <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wider">
+                  Marketplace
+                </span>
+              </div>
+            </Link>
+
+            <div className="flex items-center gap-2">
+              {/* City selector inside mobile full screen menu */}
+              <button
+                type="button"
+                onClick={() => setShowCityPicker(!showCityPicker)}
+                className="flex items-center gap-1.5 rounded-xl border border-border bg-surface-alt px-3 py-1.5 text-xs font-bold text-text hover:bg-surface"
+              >
+                <MapPin size={13} className="text-primary" />
+                <span>{selectedCity || 'Mumbai'}</span>
+                <ChevronDown size={12} className={cn('transition-transform', showCityPicker && 'rotate-180')} />
+              </button>
+
+              {/* Close Button */}
               <button
                 type="button"
                 onClick={onClose}
                 aria-label="Close menu"
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-surface-alt text-text-secondary hover:text-text"
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface-alt text-text hover:bg-danger/10 hover:text-danger hover:border-danger/30 transition-colors"
               >
-                <X size={20} aria-hidden="true" />
+                <X size={22} aria-hidden="true" />
               </button>
             </div>
+          </div>
 
-            {/* Mobile Search */}
-            <form onSubmit={handleMobileSearch} className="relative mb-4">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-light" />
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search cars, brands..."
-                className="w-full rounded-xl border border-border bg-surface-alt py-2.5 pl-9 pr-3 text-xs text-text outline-none focus:border-primary"
-              />
-            </form>
+          {/* City Selection Dropdown (Expanded) */}
+          {showCityPicker && (
+            <div className="mb-4 rounded-2xl border border-border bg-surface-alt p-3 shadow-inner">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-text-secondary">Select Your City</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                {CITIES.map((city) => (
+                  <button
+                    key={city}
+                    type="button"
+                    onClick={() => {
+                      if (setSelectedCity) setSelectedCity(city)
+                      setShowCityPicker(false)
+                    }}
+                    className={cn(
+                      'rounded-xl px-3 py-2 text-xs font-semibold text-center transition-colors',
+                      selectedCity === city
+                        ? 'bg-primary text-white font-bold shadow-xs'
+                        : 'bg-surface text-text hover:bg-primary/10 hover:text-primary'
+                    )}
+                  >
+                    {city}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
-            {/* User Profile Banner if authenticated */}
-            {isAuthenticated ? (
-              <Link
-                to="/profile"
-                onClick={onClose}
-                className="mb-4 flex items-center gap-3 rounded-2xl border border-border bg-surface-alt p-3"
-              >
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary text-xs font-bold text-white">
-                  {(user?.name || user?.phone || 'U').charAt(0).toUpperCase()}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-bold text-text">{user?.name || (user?.phone ? `+91 ${user.phone}` : 'Account')}</p>
-                  <p className="truncate text-[11px] text-text-secondary">{user?.email || user?.phone}</p>
-                </div>
-              </Link>
-            ) : null}
+          {/* Full Screen Mobile Search */}
+          <form onSubmit={handleMobileSearch} className="relative mb-5">
+            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-light" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search cars, brands, properties, electronics..."
+              className="w-full rounded-2xl border border-border bg-surface-alt py-3 pl-10 pr-4 text-xs font-medium text-text outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 shadow-xs"
+            />
+            <button
+              type="submit"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-xl bg-primary px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-primary-dark"
+            >
+              Search
+            </button>
+          </form>
 
-            {/* Mobile Navigation Links */}
-            <nav className="flex flex-col gap-1" aria-label="Mobile">
+          {/* Categorized Full-Width Navigation */}
+          <div className="mb-5">
+            <p className="mb-2 text-[11px] font-bold uppercase tracking-widest text-text-secondary px-1">
+              Explore Marketplace Categories
+            </p>
+            <nav className="flex flex-col gap-2" aria-label="Mobile Navigation">
               {navLinks.map((link) =>
                 link.dropdown ? (
-                  <div key={link.label}>
+                  <div key={link.label} className="rounded-2xl border border-border bg-surface overflow-hidden shadow-xs">
                     <button
                       type="button"
                       onClick={() => setOpenDropdown((v) => (v === link.label ? null : link.label))}
                       aria-expanded={openDropdown === link.label}
-                      className="flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-bold text-text hover:bg-surface-alt"
+                      className={cn(
+                        'flex w-full items-center justify-between p-3.5 text-xs font-bold transition-colors',
+                        openDropdown === link.label ? 'bg-primary/10 text-primary' : 'bg-surface-alt/70 text-text hover:bg-surface-alt'
+                      )}
                     >
-                      <span>{link.label}</span>
+                      <span className="text-sm font-extrabold">{link.label}</span>
                       <ChevronDown
-                        size={15}
-                        className={cn('transition-transform', openDropdown === link.label && 'rotate-180 text-primary')}
+                        size={16}
+                        className={cn('transition-transform duration-200', openDropdown === link.label && 'rotate-180 text-primary')}
                         aria-hidden="true"
                       />
                     </button>
+
                     <AnimatePresence initial={false}>
                       {openDropdown === link.label && (
                         <motion.div
@@ -581,22 +623,36 @@ function MobileMenu({ open, onClose }) {
                           animate={{ height: 'auto', opacity: 1 }}
                           exit={{ height: 0, opacity: 0 }}
                           transition={{ duration: 0.2 }}
-                          className="overflow-hidden pl-3"
+                          className="overflow-hidden p-2 space-y-1.5 bg-surface"
                         >
-                          {link.dropdown.map((item) => (
-                            item.dropdown ? (
-                              <MobileNestedDropdown key={item.label} item={item} onClose={onClose} />
-                            ) : (
+                          {link.dropdown.map((item) => {
+                            if (item.dropdown) {
+                              return <MobileNestedDropdown key={item.label} item={item} onClose={onClose} />
+                            }
+                            const IconComp = ITEM_ICONS[item.label] || Sparkles
+                            return (
                               <Link
                                 key={item.label}
                                 to={item.to}
                                 onClick={onClose}
-                                className="block rounded-lg px-3.5 py-2 text-xs font-medium text-text-secondary hover:bg-surface-alt hover:text-primary"
+                                className="flex items-start gap-3 rounded-xl p-2.5 transition-colors hover:bg-surface-alt group"
                               >
-                                {item.label}
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors mt-0.5">
+                                  <IconComp size={16} />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-text group-hover:text-primary transition-colors">
+                                    {item.label}
+                                  </p>
+                                  {item.description && (
+                                    <p className="mt-0.5 text-[11px] leading-tight text-text-secondary line-clamp-1">
+                                      {item.description}
+                                    </p>
+                                  )}
+                                </div>
                               </Link>
                             )
-                          ))}
+                          })}
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -608,42 +664,93 @@ function MobileMenu({ open, onClose }) {
                     onClick={onClose}
                     className={({ isActive }) =>
                       cn(
-                        'rounded-xl px-3.5 py-2.5 text-xs font-bold transition-colors',
-                        isActive ? 'bg-primary/10 text-primary' : 'text-text hover:bg-surface-alt'
+                        'flex items-center justify-between rounded-2xl border border-border p-3.5 text-sm font-extrabold transition-colors shadow-xs',
+                        isActive ? 'bg-primary text-white border-primary' : 'bg-surface-alt/70 text-text hover:bg-surface-alt'
                       )
                     }
                     end={link.to === '/'}
                   >
-                    {link.label}
+                    <span>{link.label}</span>
+                    <ArrowRight size={16} />
                   </NavLink>
                 )
               )}
             </nav>
+          </div>
 
-            {/* Footer CTAs */}
-            <div className="mt-auto flex flex-col gap-2.5 pt-6 border-t border-border mt-6">
-              {isAuthenticated ? (
+          {/* Quick Sell Action Grid */}
+          <div className="mb-5 rounded-2xl border border-border bg-gradient-to-br from-primary/5 to-secondary/10 p-3.5">
+            <p className="mb-2.5 text-[11px] font-bold uppercase tracking-widest text-primary">Quick Sell Options</p>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                to="/sell/car"
+                onClick={onClose}
+                className="flex items-center gap-2 rounded-xl bg-surface p-2.5 text-xs font-bold text-text border border-border shadow-2xs hover:border-primary/50"
+              >
+                <PlusCircle size={15} className="text-primary" />
+                <span>Sell Car</span>
+              </Link>
+              <Link
+                to="/sell/properties"
+                onClick={onClose}
+                className="flex items-center gap-2 rounded-xl bg-surface p-2.5 text-xs font-bold text-text border border-border shadow-2xs hover:border-primary/50"
+              >
+                <PlusCircle size={15} className="text-primary" />
+                <span>Sell Property</span>
+              </Link>
+              <Link
+                to="/sell/electronics"
+                onClick={onClose}
+                className="flex items-center gap-2 rounded-xl bg-surface p-2.5 text-xs font-bold text-text border border-border shadow-2xs hover:border-primary/50"
+              >
+                <PlusCircle size={15} className="text-primary" />
+                <span>Sell Gadget</span>
+              </Link>
+              <Link
+                to="/sell/spare-parts"
+                onClick={onClose}
+                className="flex items-center gap-2 rounded-xl bg-surface p-2.5 text-xs font-bold text-text border border-border shadow-2xs hover:border-primary/50"
+              >
+                <PlusCircle size={15} className="text-primary" />
+                <span>Sell Spare Parts</span>
+              </Link>
+            </div>
+          </div>
+
+          {/* Footer CTAs / Account Section */}
+          <div className="mt-auto flex flex-col gap-3 pt-4 border-t border-border">
+            {isAuthenticated ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-3 rounded-2xl border border-border bg-surface-alt p-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary text-xs font-bold text-white shadow-xs">
+                    {(user?.name || user?.phone || 'U').charAt(0).toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-bold text-text">{user?.name || (user?.phone ? `+91 ${user.phone}` : 'Account')}</p>
+                    <p className="truncate text-[11px] text-text-secondary">{user?.email || user?.phone}</p>
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-border py-2.5 text-xs font-bold text-danger hover:bg-danger/10"
+                  className="flex items-center justify-center gap-2 rounded-2xl border border-danger/30 bg-danger/5 py-3 text-xs font-bold text-danger hover:bg-danger/10"
                 >
                   <LogOut size={16} />
                   <span>Log Out</span>
                 </button>
-              ) : (
-                <Link
-                  to="/login"
-                  onClick={onClose}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-primary py-2.5 text-xs font-bold text-white shadow-lift hover:bg-primary-dark"
-                >
-                  <User size={16} />
-                  <span>Login</span>
-                </Link>
-              )}
-            </div>
-          </motion.div>
-        </>
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                onClick={onClose}
+                className="flex items-center justify-center gap-2 rounded-2xl bg-primary py-3 text-sm font-extrabold text-white shadow-lift hover:bg-primary-dark"
+              >
+                <User size={18} />
+                <span>Login to Your Account</span>
+              </Link>
+            )}
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>
   )
