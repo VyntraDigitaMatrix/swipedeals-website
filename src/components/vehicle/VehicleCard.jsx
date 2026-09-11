@@ -38,8 +38,11 @@ export default function VehicleCard({ car, index = 0 }) {
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/45 to-transparent" />
 
         <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
-          <Badge variant={car.condition === 'new' ? 'success' : 'neutral'} className="bg-white/95">
-            {car.condition === 'new' ? 'New' : 'Used'}
+          <Badge
+            variant={car.condition === 'new' ? 'success' : car.condition === 'like-new' ? 'info' : 'neutral'}
+            className="bg-white/95"
+          >
+            {car.condition === 'new' ? 'New' : car.condition === 'like-new' ? 'Like New' : 'Used'}
           </Badge>
           {car.verified && (
             <Badge variant="info" icon={BadgeCheck} className="bg-white/95">
@@ -74,20 +77,20 @@ export default function VehicleCard({ car, index = 0 }) {
           </div>
         )}
 
-        {car.rating != null && <Rating value={car.rating} size={12} className="mt-2" />}
+        {car.rating != null && car.rating > 0 && <Rating value={car.rating} size={12} className="mt-2" />}
 
         <div className="my-3 grid grid-cols-3 divide-x divide-border rounded-lg border border-border bg-surface-alt/60 text-center text-[11px] text-text-secondary">
           <span className="flex flex-col items-center gap-1 px-1 py-2">
             <Gauge size={13} aria-hidden="true" />
-            {formatKm(car.km)}
+            {formatKm(car.km ?? car.mileage)}
           </span>
           <span className="flex flex-col items-center gap-1 px-1 py-2">
             <Fuel size={13} aria-hidden="true" />
-            {car.fuel}
+            {car.fuel || 'Petrol'}
           </span>
           <span className="flex flex-col items-center gap-1 px-1 py-2">
-            {car.condition === 'used' ? <UserCheck size={13} aria-hidden="true" /> : <Settings2 size={13} aria-hidden="true" />}
-            {car.condition === 'used' ? OWNER_LABEL[car.owners] || `${car.owners}+ Owners` : car.transmission}
+            {car.condition === 'used' || car.condition === 'like-new' ? <UserCheck size={13} aria-hidden="true" /> : <Settings2 size={13} aria-hidden="true" />}
+            {car.condition === 'used' || car.condition === 'like-new' ? OWNER_LABEL[car.owners] || `${car.owners || 1} Owner` : car.transmission || 'Manual'}
           </span>
         </div>
 
@@ -96,15 +99,17 @@ export default function VehicleCard({ car, index = 0 }) {
             <p className="text-lg font-extrabold text-text">{formatCurrency(car.price)}</p>
             {car.emi != null && <p className="text-[11px] text-text-secondary">EMI from {formatCurrency(car.emi)}/mo</p>}
           </div>
-          {dealer && (
-            <Link
-              to={dealer.slug ? `/${dealer.slug}` : '#'}
-              onClick={(e) => e.stopPropagation()}
-              className="flex min-w-0 items-center gap-1 text-right hover:text-primary"
-            >
-              <p className="line-clamp-1 max-w-[100px] text-[11px] font-semibold text-text-secondary hover:text-primary">{dealer.name}</p>
-              {dealer.verified && <BadgeCheck size={12} className="shrink-0 text-info" aria-hidden="true" />}
-            </Link>
+          {(car.sellerName || dealer) && (
+            <div className="flex min-w-0 flex-col items-end text-right">
+              <div className="flex items-center gap-1">
+                <p className="line-clamp-1 max-w-[110px] text-[11px] font-semibold text-text-secondary">
+                  {car.sellerName || dealer?.name}
+                </p>
+                {(car.sellerType === 'ADMIN' || car.sellerType === 'DEALER' || dealer?.verified) && (
+                  <BadgeCheck size={12} className="shrink-0 text-info" aria-hidden="true" />
+                )}
+              </div>
+            </div>
           )}
         </div>
 

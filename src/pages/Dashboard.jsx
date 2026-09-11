@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
-  Clock, Eye, Heart, LayoutDashboard, MessageCircle, PackageSearch,
-  Pencil, RefreshCw, ShoppingBag, Sparkles, Tags, Trash2, User as UserIcon, X, XCircle,
+  Building2, Clock, Eye, Heart, ImagePlus, LayoutDashboard, MessageCircle, PackageSearch,
+  Pencil, RefreshCw, Rocket, ShoppingBag, Sparkles, Star, Tags, Trash2, User as UserIcon, X, XCircle,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Breadcrumb from '../components/common/Breadcrumb'
@@ -12,6 +12,9 @@ import StatCard from '../components/dashboard/StatCard'
 import SimpleBarChart from '../components/dashboard/SimpleBarChart'
 import SimpleLineChart from '../components/dashboard/SimpleLineChart'
 import SavedListingsTable from '../components/dashboard/SavedListingsTable'
+import SellerReviewSection from '../components/seller/SellerReviewSection'
+import PropertyImagesManager from '../components/dashboard/PropertyImagesManager'
+import ChatDrawer from '../components/chat/ChatDrawer'
 import Input from '../components/forms/Input'
 import Dropdown from '../components/forms/Dropdown'
 import TextArea from '../components/forms/TextArea'
@@ -19,12 +22,23 @@ import { useAuth } from '../hooks/useAuth'
 import { useWishlist } from '../hooks/useWishlist'
 import { useListingsStore } from '../hooks/useListingsStore'
 import { useVehicleListings } from '../hooks/useVehicleListings'
+import { usePropertyListings } from '../hooks/usePropertyListings'
+import { useSparePartsListings } from '../hooks/useSparePartsListings'
+import { useChat } from '../hooks/useChat'
 import {
   VEHICLE_BRANDS,
   VEHICLE_CONDITIONS,
   FUEL_TYPES,
   TRANSMISSION_TYPES,
 } from '../services/vehicleListingService'
+import {
+  PROPERTY_TYPES,
+  LISTING_TYPES,
+  FURNISHING_STATUSES,
+  CONSTRUCTION_STATUSES,
+  FACING_OPTIONS,
+  AREA_UNITS,
+} from '../services/propertyListingService'
 import { findItemsByIds } from '../utils/findItem'
 import { cn } from '../utils/cn'
 import { formatCurrencyFull } from '../utils/format'
@@ -40,6 +54,10 @@ const LISTING_STATUS_VARIANT = {
   PUBLISHED: 'success',
   REJECTED: 'danger',
   SOLD: 'info',
+  ACTIVE: 'success',
+  INACTIVE: 'neutral',
+  RENTED: 'info',
+  ARCHIVED: 'neutral',
 }
 
 const LISTING_STATUS_LABEL = {
@@ -51,6 +69,10 @@ const LISTING_STATUS_LABEL = {
   PUBLISHED: 'Live',
   REJECTED: 'Rejected',
   SOLD: 'Sold',
+  ACTIVE: 'Active',
+  INACTIVE: 'Inactive',
+  RENTED: 'Rented',
+  ARCHIVED: 'Archived',
 }
 
 const CATEGORY_LABELS = {
@@ -97,30 +119,58 @@ export default function Dashboard() {
     deleteListing,
   } = useVehicleListings()
 
+  const {
+    listings: propertyListings,
+    loading: propertyLoading,
+    fetchListings: fetchPropertyListings,
+    patchListing: patchPropertyListing,
+    deleteListing: deletePropertyListing,
+    submitListing: submitPropertyListing,
+  } = usePropertyListings()
+
+  const {
+    listings: sparePartsListings,
+    loading: sparePartsLoading,
+    fetchListings: fetchSparePartsListings,
+    deleteListing: deleteSparePartListing,
+    submitListing: submitSparePartListing,
+  } = useSparePartsListings()
+
   const [editingVehicle, setEditingVehicle] = useState(null)
   const [editForm, setEditForm] = useState({})
   const [savingEdit, setSavingEdit] = useState(false)
   const [deletingSlug, setDeletingSlug] = useState(null)
+  const [editingProperty, setEditingProperty] = useState(null)
+  const [propEditForm, setPropEditForm] = useState({})
+  const [savingPropEdit, setSavingPropEdit] = useState(false)
+  const [deletingPropSlug, setDeletingPropSlug] = useState(null)
+  const [managingImagesForSlug, setManagingImagesForSlug] = useState(null)
+  const [dashboardChatOpen, setDashboardChatOpen] = useState(false)
+  const [chatRecipient, setChatRecipient] = useState(null)
+
+  const { conversations: apiConversations, loading: chatLoading, selectConversation } = useChat(true)
 
   useEffect(() => {
-    fetchListings().catch(() => {
-      // Ignore API errors gracefully
-    })
-  }, [fetchListings])
+    fetchListings().catch(() => {})
+    fetchPropertyListings().catch(() => {})
+    fetchSparePartsListings().catch(() => {})
+  }, [fetchListings, fetchPropertyListings, fetchSparePartsListings])
 
   const savedItems = findItemsByIds(wishlist).map((item) => ({ ...item, categoryLabel: CATEGORY_LABELS[item.category] }))
   const localListings = user?.phone ? getByPhone(user.phone) : []
-  const combinedListingsCount = apiListings.length + localListings.length
+  const combinedListingsCount = apiListings.length + propertyListings.length + sparePartsListings.length + localListings.length
   const unreadCount = userMessages.filter((m) => m.unread).length
   const initials = (user?.name || 'U').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('')
 
   const TABS = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, count: null },
     { id: 'listings', label: 'My Listings', icon: Tags, count: combinedListingsCount },
+    { id: 'properties', label: 'My Properties', icon: Building2, count: propertyListings.length },
     { id: 'saved', label: 'Saved', icon: Heart, count: savedItems.length },
     { id: 'orders', label: 'Orders', icon: ShoppingBag, count: userOrders.length },
     { id: 'inquiries', label: 'Inquiries', icon: PackageSearch, count: userInquiries.length },
     { id: 'messages', label: 'Messages', icon: MessageCircle, count: unreadCount },
+    { id: 'reviews', label: 'Reviews', icon: Star, count: null },
   ]
 
   const handleOpenEdit = (v) => {
@@ -167,6 +217,69 @@ export default function Dashboard() {
       alert(`Failed to delete listing: ${err?.response?.data?.message || err?.message}`)
     } finally {
       setDeletingSlug(null)
+    }
+  }
+
+  const handleOpenPropEdit = (p) => {
+    setEditingProperty(p)
+    setPropEditForm({
+      title: p.title || '',
+      description: p.description || '',
+      propertyType: p.propertyType || 'APARTMENT',
+      listingType: p.listingType || 'FOR_SALE',
+      price: p.price || 0,
+      negotiable: p.negotiable || false,
+      bedrooms: p.bedrooms || 0,
+      bathrooms: p.bathrooms || 0,
+      balconies: p.balconies || 0,
+      builtUpArea: p.builtUpArea || 0,
+      carpetArea: p.carpetArea || 0,
+      plotArea: p.plotArea || 0,
+      areaUnit: p.areaUnit || 'SQ_FT',
+      furnishingStatus: p.furnishingStatus || 'UNFURNISHED',
+      constructionStatus: p.constructionStatus || 'READY_TO_MOVE',
+      facing: p.facing || '',
+      floor: p.floor ?? '',
+      totalFloors: p.totalFloors ?? '',
+      ageOfProperty: p.ageOfProperty ?? '',
+      city: p.city || '',
+      locality: p.locality || '',
+      address: p.address || '',
+      pincode: p.pincode || '',
+    })
+  }
+
+  const handleSavePropEdit = async () => {
+    if (!editingProperty?.slug) return
+    setSavingPropEdit(true)
+    try {
+      await patchPropertyListing(editingProperty.slug, propEditForm)
+      setEditingProperty(null)
+    } catch (err) {
+      alert(`Failed to update property: ${err?.response?.data?.message || err?.message}`)
+    } finally {
+      setSavingPropEdit(false)
+    }
+  }
+
+  const handleDeleteProperty = async (slug) => {
+    if (!window.confirm('Are you sure you want to delete this property listing?')) return
+    setDeletingPropSlug(slug)
+    try {
+      await deletePropertyListing(slug)
+    } catch (err) {
+      alert(`Failed to delete property: ${err?.response?.data?.message || err?.message}`)
+    } finally {
+      setDeletingPropSlug(null)
+    }
+  }
+
+  const handleSubmitProperty = async (slug) => {
+    if (!window.confirm('Submit this property for approval?')) return
+    try {
+      await submitPropertyListing(slug)
+    } catch (err) {
+      alert(`Failed to submit property: ${err?.response?.data?.message || err?.message}`)
     }
   }
 
@@ -399,6 +512,64 @@ export default function Dashboard() {
                 </div>
               ))}
 
+              {/* API Spare Parts Listings */}
+              {sparePartsListings.map((s) => (
+                <div key={s.slug || s.id} className="group relative flex flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-soft transition-transform hover:-translate-y-0.5">
+                  <div className="flex gap-4">
+                    <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
+                      <img src={s.images?.[0]?.imageUrl || PLACEHOLDER_IMAGE} alt="" className="h-full w-full object-cover" />
+                      <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-danger" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="line-clamp-1 text-sm font-bold text-text">
+                          {s.title}
+                        </p>
+                        <Badge variant={LISTING_STATUS_VARIANT[s.status] || 'neutral'}>
+                          {LISTING_STATUS_LABEL[s.status] || s.status}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-xs text-text-secondary">
+                        {s.category} · {s.brand}
+                      </p>
+                      <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(s.price)}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                    {s.slug && (
+                      <Link to={`/spare-parts/${s.slug}`} className="text-xs font-semibold text-primary hover:underline">
+                        View details &rarr;
+                      </Link>
+                    )}
+                    <div className="flex gap-2">
+                      {s.status === 'DRAFT' && (
+                        <Button size="xs" variant="primary" icon={Rocket} onClick={() => {
+                          if (window.confirm('Submit this spare part for approval?')) {
+                            submitSparePartListing(s.slug)
+                          }
+                        }}>
+                          Submit
+                        </Button>
+                      )}
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        icon={Trash2}
+                        className="text-danger border-danger/20 hover:bg-danger/10"
+                        onClick={() => {
+                          if (window.confirm('Are you sure you want to delete this spare part listing?')) {
+                            deleteSparePartListing(s.slug)
+                          }
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
               {/* Local Fallback Listings */}
               {localListings.map((listing) => (
                 <div key={listing.id} className="group flex gap-4 rounded-2xl border border-border bg-surface p-4 shadow-soft">
@@ -416,6 +587,105 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'properties' && (
+        <div>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-text-secondary">{propertyListings.length} propert{propertyListings.length === 1 ? 'y' : 'ies'}</p>
+              <button
+                type="button"
+                onClick={() => fetchPropertyListings()}
+                disabled={propertyLoading}
+                className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+              >
+                <RefreshCw size={12} className={cn(propertyLoading && 'animate-spin')} /> Refresh
+              </button>
+            </div>
+            <Button to="/sell/property" variant="primary" size="sm" icon={Building2}>
+              List New Property
+            </Button>
+          </div>
+
+          {propertyListings.length === 0 && !propertyLoading ? (
+            <EmptyState
+              icon={Building2}
+              title="No properties listed yet"
+              description="List your apartment, villa, plot or commercial space — our team reviews it before it goes live."
+              actionLabel="List Property"
+              actionTo="/sell/property"
+            />
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {propertyListings.map((p) => {
+                const propType = PROPERTY_TYPES.find((t) => t.value === p.propertyType)?.label || titleCaseEnum(p.propertyType || '')
+                const listType = LISTING_TYPES.find((t) => t.value === p.listingType)?.label || titleCaseEnum(p.listingType || '')
+                const primaryImage = p.images?.find((img) => img.isPrimary)?.imageUrl || p.images?.[0]?.imageUrl || PLACEHOLDER_IMAGE
+                return (
+                  <div key={p.slug || p.id} className="group relative flex flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-soft transition-transform hover:-translate-y-0.5">
+                    <div className="flex gap-4">
+                      <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
+                        <img src={primaryImage} alt="" className="h-full w-full object-cover" />
+                        <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-success" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="line-clamp-1 text-sm font-bold text-text">{p.title}</p>
+                          <Badge variant={LISTING_STATUS_VARIANT[p.status] || 'neutral'}>
+                            {LISTING_STATUS_LABEL[p.status] || p.status}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-text-secondary">
+                          {propType} · {listType}
+                        </p>
+                        <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(p.price)}</p>
+                      </div>
+                    </div>
+
+                    {/* Property details grid */}
+                    <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-alt/70 p-2.5 font-mono text-[11px] text-text-secondary">
+                      <div><span className="text-text-light">City:</span> {p.city || 'N/A'}</div>
+                      <div><span className="text-text-light">Locality:</span> {p.locality || 'N/A'}</div>
+                      <div><span className="text-text-light">Area:</span> {p.builtUpArea || p.carpetArea || p.plotArea || 'N/A'} {p.areaUnit ? titleCaseEnum(p.areaUnit) : ''}</div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                      {p.slug && (
+                        <Link to={`/properties/${p.slug}`} className="text-xs font-semibold text-primary hover:underline">
+                          View details &rarr;
+                        </Link>
+                      )}
+                      <div className="flex gap-2">
+                        {p.status === 'DRAFT' && (
+                          <Button size="xs" variant="primary" icon={Rocket} onClick={() => handleSubmitProperty(p.slug)}>
+                            Submit
+                          </Button>
+                        )}
+                        <Button size="xs" variant="outline" icon={ImagePlus} onClick={() => setManagingImagesForSlug(p.slug)}>
+                          Images
+                        </Button>
+                        <Button size="xs" variant="outline" icon={Pencil} onClick={() => handleOpenPropEdit(p)}>
+                          Edit
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          icon={Trash2}
+                          className="text-danger border-danger/20 hover:bg-danger/10"
+                          disabled={deletingPropSlug === p.slug}
+                          onClick={() => handleDeleteProperty(p.slug)}
+                        >
+                          {deletingPropSlug === p.slug ? 'Deleting...' : 'Delete'}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -470,7 +740,16 @@ export default function Dashboard() {
               <p className="mt-1 text-sm text-text-secondary">Regarding: {inquiry.item}</p>
               <p className="mt-1 font-mono text-[11px] text-text-light">{inquiry.date}</p>
               <div className="mt-4 flex gap-2">
-                <Button size="sm" variant="primary" className="flex-1" icon={MessageCircle}>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  className="flex-1"
+                  icon={MessageCircle}
+                  onClick={() => {
+                    setChatRecipient(inquiry.id)
+                    setDashboardChatOpen(true)
+                  }}
+                >
                   Message Seller
                 </Button>
                 <Button size="sm" variant="outline" className="flex-1" icon={Eye}>
@@ -483,20 +762,70 @@ export default function Dashboard() {
       )}
 
       {tab === 'messages' && (
-        <div className="divide-y divide-border rounded-2xl border border-border bg-surface">
-          {userMessages.map((msg) => (
-            <div key={msg.id} className={cn('flex items-start gap-3 p-5', msg.unread && 'bg-primary/[0.03]')}>
-              <img src={msg.avatar} alt={msg.name} className="h-11 w-11 shrink-0 rounded-full object-cover" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <p className="font-bold text-text">{msg.name}</p>
-                  <span className="font-mono text-xs text-text-light">{msg.time}</span>
-                </div>
-                <p className="mt-1 line-clamp-1 text-sm text-text-secondary">{msg.preview}</p>
+        <div className="space-y-4">
+          {apiConversations.length > 0 && (
+            <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-surface">
+              <div className="bg-surface-alt p-3 text-xs font-bold uppercase tracking-wider text-text-secondary">
+                Live Conversations ({apiConversations.length})
               </div>
-              {msg.unread && <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-primary" aria-label="Unread" />}
+              {apiConversations.map((c) => (
+                <div
+                  key={c.id}
+                  onClick={() => {
+                    selectConversation(c)
+                    setDashboardChatOpen(true)
+                  }}
+                  className="flex cursor-pointer items-start gap-3 p-5 transition-colors hover:bg-surface-alt/50"
+                >
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-primary">
+                    <User size={18} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between">
+                      <p className="font-bold text-text">{c.participantTwoRole || 'Seller'}</p>
+                      {c.lastMessage?.createdAt && (
+                        <span className="font-mono text-xs text-text-light">
+                          {new Date(c.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 line-clamp-1 text-sm text-text-secondary">
+                      {c.lastMessage?.content || 'Click to open conversation'}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
+
+          <div className="divide-y divide-border rounded-2xl border border-border bg-surface">
+            {userMessages.map((msg) => (
+              <div
+                key={msg.id}
+                onClick={() => {
+                  setChatRecipient(msg.id)
+                  setDashboardChatOpen(true)
+                }}
+                className={cn('flex cursor-pointer items-start gap-3 p-5 transition-colors hover:bg-surface-alt/50', msg.unread && 'bg-primary/[0.03]')}
+              >
+                <img src={msg.avatar} alt={msg.name} className="h-11 w-11 shrink-0 rounded-full object-cover" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-text">{msg.name}</p>
+                    <span className="font-mono text-xs text-text-light">{msg.time}</span>
+                  </div>
+                  <p className="mt-1 line-clamp-1 text-sm text-text-secondary">{msg.preview}</p>
+                </div>
+                {msg.unread && <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-primary" aria-label="Unread" />}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {tab === 'reviews' && (
+        <div className="max-w-4xl">
+          <SellerReviewSection sellerId={user?.id || '3fa85f64-5717-4562-b3fc-2c963f66afa6'} sellerName={user?.name || 'Seller'} />
         </div>
       )}
 
@@ -557,6 +886,99 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Edit Property Modal */}
+      {editingProperty && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-surface p-6 shadow-xl sm:p-8">
+            <div className="mb-6 flex items-center justify-between border-b border-border pb-4">
+              <h2 className="text-xl font-bold text-text">Edit Property Listing</h2>
+              <button type="button" onClick={() => setEditingProperty(null)} className="rounded-lg p-1 text-text-secondary hover:bg-surface-alt">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <Input label="Title" value={propEditForm.title} onChange={(e) => setPropEditForm((prev) => ({ ...prev, title: e.target.value }))} />
+              <div className="grid grid-cols-2 gap-4">
+                <Dropdown label="Property Type" value={propEditForm.propertyType} onChange={(v) => setPropEditForm((prev) => ({ ...prev, propertyType: v }))} options={PROPERTY_TYPES} />
+                <Dropdown label="Listing Type" value={propEditForm.listingType} onChange={(v) => setPropEditForm((prev) => ({ ...prev, listingType: v }))} options={LISTING_TYPES} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="Price (₹)" type="number" value={propEditForm.price} onChange={(e) => setPropEditForm((prev) => ({ ...prev, price: parseFloat(e.target.value) || 0 }))} />
+                <label className="flex items-center gap-2 text-sm text-text self-end pb-2">
+                  <input
+                    type="checkbox"
+                    checked={propEditForm.negotiable}
+                    onChange={(e) => setPropEditForm((prev) => ({ ...prev, negotiable: e.target.checked }))}
+                    className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                  />
+                  Negotiable
+                </label>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <Input label="Bedrooms" type="number" min="0" value={propEditForm.bedrooms} onChange={(e) => setPropEditForm((prev) => ({ ...prev, bedrooms: parseInt(e.target.value, 10) || 0 }))} />
+                <Input label="Bathrooms" type="number" min="0" value={propEditForm.bathrooms} onChange={(e) => setPropEditForm((prev) => ({ ...prev, bathrooms: parseInt(e.target.value, 10) || 0 }))} />
+                <Input label="Balconies" type="number" min="0" value={propEditForm.balconies} onChange={(e) => setPropEditForm((prev) => ({ ...prev, balconies: parseInt(e.target.value, 10) || 0 }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Dropdown label="Area Unit" value={propEditForm.areaUnit} onChange={(v) => setPropEditForm((prev) => ({ ...prev, areaUnit: v }))} options={AREA_UNITS} />
+                <Input label="Built-Up Area" type="number" min="0" step="0.1" value={propEditForm.builtUpArea} onChange={(e) => setPropEditForm((prev) => ({ ...prev, builtUpArea: parseFloat(e.target.value) || 0 }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="Carpet Area" type="number" min="0" step="0.1" value={propEditForm.carpetArea} onChange={(e) => setPropEditForm((prev) => ({ ...prev, carpetArea: parseFloat(e.target.value) || 0 }))} />
+                <Input label="Plot Area" type="number" min="0" step="0.1" value={propEditForm.plotArea} onChange={(e) => setPropEditForm((prev) => ({ ...prev, plotArea: parseFloat(e.target.value) || 0 }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Dropdown label="Furnishing" value={propEditForm.furnishingStatus} onChange={(v) => setPropEditForm((prev) => ({ ...prev, furnishingStatus: v }))} options={FURNISHING_STATUSES} />
+                <Dropdown label="Construction Status" value={propEditForm.constructionStatus} onChange={(v) => setPropEditForm((prev) => ({ ...prev, constructionStatus: v }))} options={CONSTRUCTION_STATUSES} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Dropdown label="Facing" value={propEditForm.facing} onChange={(v) => setPropEditForm((prev) => ({ ...prev, facing: v }))} placeholder="Select" options={FACING_OPTIONS} />
+                <Input label="Age of Property (years)" type="number" min="0" value={propEditForm.ageOfProperty} onChange={(e) => setPropEditForm((prev) => ({ ...prev, ageOfProperty: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="Floor" type="number" min="0" value={propEditForm.floor} onChange={(e) => setPropEditForm((prev) => ({ ...prev, floor: e.target.value }))} />
+                <Input label="Total Floors" type="number" min="0" value={propEditForm.totalFloors} onChange={(e) => setPropEditForm((prev) => ({ ...prev, totalFloors: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="City" value={propEditForm.city} onChange={(e) => setPropEditForm((prev) => ({ ...prev, city: e.target.value }))} />
+                <Input label="Locality" value={propEditForm.locality} onChange={(e) => setPropEditForm((prev) => ({ ...prev, locality: e.target.value }))} />
+              </div>
+              <Input label="Address" value={propEditForm.address} onChange={(e) => setPropEditForm((prev) => ({ ...prev, address: e.target.value }))} />
+              <Input label="Pincode" maxLength={6} value={propEditForm.pincode} onChange={(e) => setPropEditForm((prev) => ({ ...prev, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) }))} />
+              <TextArea label="Description" value={propEditForm.description} onChange={(e) => setPropEditForm((prev) => ({ ...prev, description: e.target.value }))} />
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3 border-t border-border pt-4">
+              <Button variant="outline" onClick={() => setEditingProperty(null)}>
+                Cancel
+              </Button>
+              <Button variant="primary" disabled={savingPropEdit} onClick={handleSavePropEdit}>
+                {savingPropEdit ? 'Saving Changes...' : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Property Images Manager Modal */}
+      {managingImagesForSlug && (
+        <PropertyImagesManager
+          slug={managingImagesForSlug}
+          onClose={() => {
+            setManagingImagesForSlug(null)
+            fetchPropertyListings() // refresh listings to pick up new primary images
+          }}
+        />
+      )}
+
+      {/* Global Chat Drawer */}
+      <ChatDrawer
+        isOpen={dashboardChatOpen}
+        onClose={() => setDashboardChatOpen(false)}
+        recipientId={chatRecipient}
+      />
     </div>
   )
 }

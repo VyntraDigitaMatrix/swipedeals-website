@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowRight,
@@ -41,6 +41,7 @@ import {
   mapPropertyToCard,
 } from '../services/publicListingService'
 import { useListingsStore } from '../hooks/useListingsStore'
+import { useAuth } from '../hooks/useAuth'
 import { cn } from '../utils/cn'
 
 const CATEGORY_LABELS = {
@@ -77,6 +78,12 @@ function EmptyState({ label, to }) {
 }
 
 export default function Home() {
+  const { isAuthenticated } = useAuth()
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />
+  }
+
   // Community listings (user-submitted)
   const { approved: approvedUserListings } = useListingsStore()
   const communityListings = approvedUserListings.slice(0, 8).map((l) => ({

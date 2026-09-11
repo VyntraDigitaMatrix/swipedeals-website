@@ -29,16 +29,10 @@ export default function Login() {
   const [knownUsers, setKnownUsers] = useLocalStorage('swipedeals_known_users', {})
   const otpStartedRef = useRef(false)
 
-  const { login, isAuthenticated } = useAuth()
+  const { login } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const redirectTo = searchParams.get('redirect') || '/dashboard'
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      navigate(redirectTo, { replace: true })
-    }
-  }, [isAuthenticated, navigate, redirectTo])
 
   useEffect(() => {
     if (step !== 'otp' || resendIn <= 0) return
@@ -198,13 +192,6 @@ export default function Login() {
                 <Button type="submit" variant="primary" fullWidth size="lg" loading={loading}>
                   Send OTP
                 </Button>
-
-                <p className="mt-4 text-center text-xs text-text-secondary">
-                  Don&rsquo;t have an account?{' '}
-                  <Link to="/register" className="font-semibold text-primary hover:underline">
-                    Create an account
-                  </Link>
-                </p>
               </form>
             </>
           )}

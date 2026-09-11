@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import {
-  Bath, Bed, Building2, Check, Clock, ImagePlus,
-  Landmark, MapPin, Maximize, Phone, Rocket, ShieldCheck, Sofa, Upload, User, X,
+  Bath, Bed, Building2, Check, Clock, Compass, ImagePlus,
+  Landmark, MapPin, Maximize, Phone, Rocket, Ruler, ShieldCheck, Sofa, Upload, User, X,
 } from 'lucide-react'
 import Breadcrumb from '../components/common/Breadcrumb'
 import Button from '../components/buttons/Button'
@@ -13,106 +13,164 @@ import Badge from '../components/common/Badge'
 import SellAccessGate from '../components/common/SellAccessGate'
 import { useAuth } from '../hooks/useAuth'
 import { useKyc } from '../hooks/useKyc'
-import { useListingsStore } from '../hooks/useListingsStore'
-import { propertyTypes } from '../data/properties'
+import { usePropertyListings } from '../hooks/usePropertyListings'
+import propertyListingService, {
+  PROPERTY_TYPES,
+  LISTING_TYPES,
+  FURNISHING_STATUSES,
+  CONSTRUCTION_STATUSES,
+  FACING_OPTIONS,
+  AREA_UNITS,
+} from '../services/propertyListingService'
 import { cn } from '../utils/cn'
 import { formatCurrencyFull } from '../utils/format'
 
-const PROPERTY_TYPE_OPTIONS = [...propertyTypes, 'Other'].map((t) => ({ value: t, label: t }))
-const PURPOSE_OPTIONS = [{ value: 'Buy', label: 'Sell (Buy for buyer)' }, { value: 'Rent', label: 'Rent Out' }, { value: 'Lease', label: 'Lease' }]
-const BEDROOM_OPTIONS = ['0', '1', '2', '3', '4', '5+'].map((v) => ({ value: v, label: v === '0' ? 'N/A (Plot/Land/Commercial)' : `${v} BHK` }))
-const FURNISHING_OPTIONS = [
-  { value: 'unfurnished', label: 'Unfurnished' },
-  { value: 'semi', label: 'Semi-Furnished' },
-  { value: 'full', label: 'Fully Furnished' },
-]
-const AGE_OPTIONS = [
-  { value: 'new', label: 'New / Under Construction' },
-  { value: '0-5', label: '0 – 5 years' },
-  { value: '5-10', label: '5 – 10 years' },
-  { value: '10+', label: '10+ years' },
+const BEDROOM_OPTIONS = [
+  { value: '0', label: 'N/A (Plot / Land / Commercial)' },
+  { value: '1', label: '1 BHK' },
+  { value: '2', label: '2 BHK' },
+  { value: '3', label: '3 BHK' },
+  { value: '4', label: '4 BHK' },
+  { value: '5', label: '5+ BHK' },
 ]
 
-const initialForm = (user) => ({
-  images: [],
-  propertyType: '',
-  purpose: 'Buy',
+const initialForm = () => ({
   title: '',
-  bedrooms: '0',
-  bathrooms: '',
-  area: '',
-  furnishing: 'unfurnished',
+  description: '',
+  propertyType: '',
+  listingType: 'FOR_SALE',
+  price: '',
+  negotiable: false,
+  bedrooms: 0,
+  bathrooms: 0,
+  balconies: 0,
+  builtUpArea: '',
+  carpetArea: '',
+  plotArea: '',
+  areaUnit: 'SQ_FT',
+  furnishingStatus: 'UNFURNISHED',
+  constructionStatus: 'READY_TO_MOVE',
+  facing: '',
   floor: '',
   totalFloors: '',
-  propertyAge: 'new',
-  amenities: '',
-  description: '',
-  price: '',
-  location: '',
+  ageOfProperty: '',
   city: '',
-  sellerName: user?.name || '',
-  sellerPhone: user?.phone || '',
+  locality: '',
+  address: '',
+  pincode: '',
 })
 
 export default function SellProperty() {
   const { user, isAuthenticated } = useAuth()
   const { isKycVerified } = useKyc()
-  const { addListing } = useListingsStore()
+  const { createListing, submitListing, loading, error } = usePropertyListings()
   const location = useLocation()
 
-  const [activeTab, setActiveTab] = useState('photos')
+  const [activeTab, setActiveTab] = useState('details')
   const [published, setPublished] = useState(false)
-  const [form, setForm] = useState(() => initialForm(user))
+  const [createdSlug, setCreatedSlug] = useState(null)
+  const [submitError, setSubmitError] = useState(null)
+  const [form, setForm] = useState(initialForm)
+  const [selectedFiles, setSelectedFiles] = useState([])
 
   const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
-  const isRental = form.purpose === 'Rent'
+  const isRental = form.listingType === 'FOR_RENT'
 
-  const imagesValid = form.images.length > 0
-  const detailsValid = !!form.propertyType && form.title.trim().length > 2 && Number(form.area) > 0 && form.description.trim().length > 5
+  const handleFileChange = (e) => {
+    if (e.target.files) {
+      setSelectedFiles((prev) => [...prev, ...Array.from(e.target.files)])
+    }
+  }
+
+  const removeFile = (index) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  // Validation
+  const detailsValid = !!form.propertyType && form.title.trim().length > 2 && form.description.trim().length > 5
+  const areaValid = Number(form.builtUpArea) > 0 || Number(form.carpetArea) > 0 || Number(form.plotArea) > 0
   const pricingValid = Number(form.price) > 0
-  const contactValid = form.sellerName.trim().length > 1 && /^\d{10}$/.test(form.sellerPhone) && form.location.trim().length > 2 && form.city.trim().length > 1
-  const canSubmit = imagesValid && detailsValid && pricingValid && contactValid
+  const locationValid = form.city.trim().length > 1 && form.locality.trim().length > 1
+  const imagesValid = selectedFiles.length > 0
+  const canSubmit = detailsValid && areaValid && pricingValid && locationValid && imagesValid
 
   const TABS = [
-    { id: 'photos', label: 'Photos', valid: imagesValid },
     { id: 'details', label: 'Property Details', valid: detailsValid },
+    { id: 'area', label: 'Area & Layout', valid: areaValid },
     { id: 'pricing', label: 'Pricing', valid: pricingValid },
-    { id: 'contact', label: 'Contact', valid: contactValid },
+    { id: 'location', label: 'Location', valid: locationValid },
+    { id: 'images', label: 'Images', valid: imagesValid },
     { id: 'preview', label: 'Preview' },
   ]
 
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files || [])
-    const urls = files.map((f) => URL.createObjectURL(f))
-    update('images', [...form.images, ...urls].slice(0, 8))
+  const buildPayload = () => ({
+    title: form.title.trim(),
+    description: form.description.trim(),
+    propertyType: form.propertyType,
+    listingType: form.listingType,
+    price: Number(form.price),
+    negotiable: form.negotiable,
+    bedrooms: Number(form.bedrooms) || 0,
+    bathrooms: Number(form.bathrooms) || 0,
+    balconies: Number(form.balconies) || 0,
+    builtUpArea: Number(form.builtUpArea) || 0,
+    carpetArea: Number(form.carpetArea) || 0,
+    plotArea: Number(form.plotArea) || 0,
+    areaUnit: form.areaUnit,
+    furnishingStatus: form.furnishingStatus,
+    constructionStatus: form.constructionStatus,
+    ...(form.facing ? { facing: form.facing } : {}),
+    ...(form.floor !== '' ? { floor: Number(form.floor) } : {}),
+    ...(form.totalFloors !== '' ? { totalFloors: Number(form.totalFloors) } : {}),
+    ...(form.ageOfProperty !== '' ? { ageOfProperty: Number(form.ageOfProperty) } : {}),
+    city: form.city.trim(),
+    locality: form.locality.trim(),
+    ...(form.address.trim() ? { address: form.address.trim() } : {}),
+    ...(form.pincode.trim() ? { pincode: form.pincode.trim() } : {}),
+  })
+
+  const handlePublish = async () => {
+    if (!canSubmit) return
+    setSubmitError(null)
+    try {
+      // Step 1: Create the listing (saved as DRAFT)
+      const created = await createListing(buildPayload())
+      const slug = created?.slug
+      if (!slug) throw new Error('Could not get slug from created listing')
+
+      // Step 2: Upload images
+      if (selectedFiles.length > 0) {
+        await propertyListingService.uploadImages(slug, selectedFiles)
+      }
+
+      // Step 3: Submit for approval
+      await submitListing(slug)
+      setCreatedSlug(slug)
+      setPublished(true)
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to submit listing.'
+      setSubmitError(msg)
+    }
   }
 
-  const handlePublish = () => {
-    if (!canSubmit) return
-    addListing({
-      category: 'properties',
-      sellerType: 'individual',
-      sellerName: form.sellerName,
-      sellerPhone: form.sellerPhone,
-      title: form.title,
-      description: form.description,
-      condition: form.propertyAge === 'new' ? 'new' : 'used',
-      location: form.location,
-      city: form.city,
-      price: Number(form.price),
-      images: form.images,
-      propertyType: form.propertyType,
-      purpose: form.purpose,
-      bedrooms: Number(form.bedrooms) || 0,
-      bathrooms: Number(form.bathrooms) || 0,
-      area: Number(form.area) || 0,
-      furnishing: form.furnishing,
-      floor: form.floor,
-      totalFloors: form.totalFloors,
-      propertyAge: form.propertyAge,
-      amenities: form.amenities,
-    })
-    setPublished(true)
+  const handleSaveDraft = async () => {
+    if (!detailsValid) return
+    setSubmitError(null)
+    try {
+      const created = await createListing(buildPayload())
+      const slug = created?.slug
+      
+      if (slug && selectedFiles.length > 0) {
+        await propertyListingService.uploadImages(slug, selectedFiles)
+      }
+      
+      setCreatedSlug(slug)
+      setSubmitError(null)
+      alert('Draft saved successfully! You can submit it later from your dashboard.')
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to save draft.'
+      setSubmitError(msg)
+    }
   }
 
   if (published) {
@@ -139,8 +197,9 @@ export default function SellProperty() {
             variant="outline"
             onClick={() => {
               setPublished(false)
-              setActiveTab('photos')
-              setForm(initialForm(user))
+              setActiveTab('details')
+              setForm(initialForm())
+              setCreatedSlug(null)
             }}
           >
             List Another Property
@@ -198,73 +257,52 @@ export default function SellProperty() {
         ))}
       </div>
 
+      {submitError && (
+        <div className="mb-4 rounded-xl border border-danger/20 bg-danger/5 p-3 text-sm text-danger">
+          {submitError}
+        </div>
+      )}
+
       <div className="mx-auto max-w-2xl rounded-2xl border border-border bg-surface p-6 shadow-soft sm:p-8">
-        {activeTab === 'photos' && (
-          <div>
-            <h2 className="mb-5 text-lg font-bold text-text">Upload photos</h2>
-            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-10 text-center hover:border-primary/40">
-              <Upload size={28} className="text-text-light" aria-hidden="true" />
-              <span className="text-sm font-semibold text-text">Click to upload or drag and drop</span>
-              <span className="text-xs text-text-light">PNG, JPG up to 10MB (max 8 photos) &mdash; include exteriors, rooms &amp; the view</span>
-              <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
-            </label>
-
-            {form.images.length > 0 && (
-              <div className="mt-5 grid grid-cols-4 gap-3">
-                {form.images.map((src, i) => (
-                  <div key={src} className="group relative aspect-square overflow-hidden rounded-lg">
-                    <img src={src} alt="" className="h-full w-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => update('images', form.images.filter((_, idx) => idx !== i))}
-                      aria-label="Remove photo"
-                      className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                    >
-                      <X size={12} aria-hidden="true" />
-                    </button>
-                  </div>
-                ))}
-                {form.images.length < 8 && (
-                  <label className="flex aspect-square cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border text-text-light hover:border-primary/40">
-                    <ImagePlus size={20} aria-hidden="true" />
-                    <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
-                  </label>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
         {activeTab === 'details' && (
           <div className="space-y-5">
             <h2 className="text-lg font-bold text-text">Property details</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Dropdown label="Property Type" value={form.propertyType} onChange={(v) => update('propertyType', v)} placeholder="Select type" options={PROPERTY_TYPE_OPTIONS} />
-              <Dropdown label="Purpose" value={form.purpose} onChange={(v) => update('purpose', v)} options={PURPOSE_OPTIONS} />
+              <Dropdown label="Property Type *" value={form.propertyType} onChange={(v) => update('propertyType', v)} placeholder="Select type" options={PROPERTY_TYPES} />
+              <Dropdown label="Listing Type *" value={form.listingType} onChange={(v) => update('listingType', v)} options={LISTING_TYPES} />
             </div>
-            <Input label="Listing Title" icon={Building2} placeholder="e.g. Skyline Heights 3BHK Sea-View Apartment" value={form.title} onChange={(e) => update('title', e.target.value)} />
+            <Input label="Listing Title *" icon={Building2} placeholder="e.g. Skyline Heights 3BHK Sea-View Apartment" value={form.title} onChange={(e) => update('title', e.target.value)} />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Dropdown label="Bedrooms" value={form.bedrooms} onChange={(v) => update('bedrooms', v)} options={BEDROOM_OPTIONS} />
+              <Dropdown label="Bedrooms" value={String(form.bedrooms)} onChange={(v) => update('bedrooms', Number(v))} options={BEDROOM_OPTIONS} />
               <Input label="Bathrooms" icon={Bath} type="number" min="0" placeholder="e.g. 2" value={form.bathrooms} onChange={(e) => update('bathrooms', e.target.value)} />
-              <Input label="Area (sq. ft.)" icon={Maximize} type="number" min="0" placeholder="e.g. 1850" value={form.area} onChange={(e) => update('area', e.target.value)} />
+              <Input label="Balconies" type="number" min="0" placeholder="e.g. 1" value={form.balconies} onChange={(e) => update('balconies', e.target.value)} />
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Dropdown label="Furnishing" value={form.furnishing} onChange={(v) => update('furnishing', v)} options={FURNISHING_OPTIONS} />
-              <Dropdown label="Property Age" value={form.propertyAge} onChange={(v) => update('propertyAge', v)} options={AGE_OPTIONS} />
+              <Dropdown label="Furnishing" value={form.furnishingStatus} onChange={(v) => update('furnishingStatus', v)} options={FURNISHING_STATUSES} />
+              <Dropdown label="Construction Status" value={form.constructionStatus} onChange={(v) => update('constructionStatus', v)} options={CONSTRUCTION_STATUSES} />
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Input label="Floor Number (optional)" placeholder="e.g. 7" value={form.floor} onChange={(e) => update('floor', e.target.value)} />
-              <Input label="Total Floors in Building (optional)" placeholder="e.g. 18" value={form.totalFloors} onChange={(e) => update('totalFloors', e.target.value)} />
+              <Dropdown label="Facing (optional)" value={form.facing} onChange={(v) => update('facing', v)} placeholder="Select facing" options={FACING_OPTIONS} />
+              <Input label="Age of Property (years, optional)" type="number" min="0" placeholder="e.g. 5" value={form.ageOfProperty} onChange={(e) => update('ageOfProperty', e.target.value)} />
             </div>
-            <TextArea
-              label="Amenities (optional)"
-              placeholder="e.g. Covered Parking, Lift, Gym, Swimming Pool, 24x7 Security"
-              value={form.amenities}
-              onChange={(e) => update('amenities', e.target.value)}
-              hint="Separate amenities with commas."
-              rows={2}
-            />
-            <TextArea label="Description" placeholder="Describe the property, nearby landmarks, why it's a great buy..." value={form.description} onChange={(e) => update('description', e.target.value)} />
+            <TextArea label="Description *" placeholder="Describe the property, nearby landmarks, why it's a great buy..." value={form.description} onChange={(e) => update('description', e.target.value)} />
+          </div>
+        )}
+
+        {activeTab === 'area' && (
+          <div className="space-y-5">
+            <h2 className="text-lg font-bold text-text">Area &amp; Layout</h2>
+            <Dropdown label="Area Unit" value={form.areaUnit} onChange={(v) => update('areaUnit', v)} options={AREA_UNITS} />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Input label="Built-Up Area" icon={Ruler} type="number" min="0" step="0.1" placeholder="e.g. 1850" value={form.builtUpArea} onChange={(e) => update('builtUpArea', e.target.value)} />
+              <Input label="Carpet Area" icon={Ruler} type="number" min="0" step="0.1" placeholder="e.g. 1450" value={form.carpetArea} onChange={(e) => update('carpetArea', e.target.value)} />
+              <Input label="Plot Area" icon={Ruler} type="number" min="0" step="0.1" placeholder="e.g. 2400" value={form.plotArea} onChange={(e) => update('plotArea', e.target.value)} />
+            </div>
+            <p className="text-xs text-text-light">Fill at least one area field. Plot area is especially relevant for plots, villas and independent houses.</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input label="Floor Number (optional)" placeholder="e.g. 7" type="number" min="0" value={form.floor} onChange={(e) => update('floor', e.target.value)} />
+              <Input label="Total Floors in Building (optional)" placeholder="e.g. 18" type="number" min="0" value={form.totalFloors} onChange={(e) => update('totalFloors', e.target.value)} />
+            </div>
           </div>
         )}
 
@@ -272,34 +310,75 @@ export default function SellProperty() {
           <div className="space-y-5">
             <h2 className="text-lg font-bold text-text">Pricing</h2>
             <Input
-              label={isRental ? 'Monthly Rent (₹)' : 'Price (₹)'}
+              label={isRental ? 'Monthly Rent (₹) *' : 'Price (₹) *'}
               type="number"
               placeholder={isRental ? 'e.g. 45000' : 'e.g. 24500000'}
               value={form.price}
               onChange={(e) => update('price', e.target.value)}
               hint="Set a competitive price based on similar listings in your area."
             />
+            <label className="flex items-center gap-2 text-sm text-text">
+              <input
+                type="checkbox"
+                checked={form.negotiable}
+                onChange={(e) => update('negotiable', e.target.checked)}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              />
+              Price is negotiable
+            </label>
           </div>
         )}
 
-        {activeTab === 'contact' && (
+        {activeTab === 'location' && (
           <div className="space-y-5">
-            <h2 className="text-lg font-bold text-text">Contact &amp; location</h2>
-            <p className="-mt-3 text-xs text-text-secondary">Shown to buyers so they can reach you directly once your listing is approved.</p>
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Your Name" icon={User} placeholder="e.g. Rohan Mehta" value={form.sellerName} onChange={(e) => update('sellerName', e.target.value)} />
-              <Input
-                label="Phone Number"
-                icon={Phone}
-                type="tel"
-                placeholder="98765 43210"
-                maxLength={10}
-                value={form.sellerPhone}
-                onChange={(e) => update('sellerPhone', e.target.value.replace(/\D/g, '').slice(0, 10))}
-              />
+            <h2 className="text-lg font-bold text-text">Location details</h2>
+            <p className="-mt-3 text-xs text-text-secondary">Provide accurate location info so buyers can find your listing easily.</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input label="City *" icon={MapPin} placeholder="e.g. Mumbai" value={form.city} onChange={(e) => update('city', e.target.value)} />
+              <Input label="Locality *" icon={MapPin} placeholder="e.g. Bandra West" value={form.locality} onChange={(e) => update('locality', e.target.value)} />
             </div>
-            <Input label="Locality" icon={MapPin} placeholder="e.g. Bandra West" value={form.location} onChange={(e) => update('location', e.target.value)} />
-            <Input label="City" placeholder="e.g. Mumbai" value={form.city} onChange={(e) => update('city', e.target.value)} />
+            <Input label="Full Address (optional)" icon={MapPin} placeholder="e.g. 12, Palm Grove, Near XYZ Hospital" value={form.address} onChange={(e) => update('address', e.target.value)} />
+            <Input label="Pincode (optional)" placeholder="e.g. 400050" maxLength={6} value={form.pincode} onChange={(e) => update('pincode', e.target.value.replace(/\D/g, '').slice(0, 6))} />
+          </div>
+        )}
+
+        {activeTab === 'images' && (
+          <div className="space-y-5">
+            <h2 className="text-lg font-bold text-text">Photos</h2>
+            <p className="-mt-3 text-xs text-text-secondary">Upload high quality photos of the property to get more inquiries. The first photo will be the main cover image.</p>
+            
+            <div className="flex flex-col gap-4">
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-surface-alt py-10 transition-colors hover:border-primary hover:bg-primary/5">
+                <div className="rounded-full bg-primary/10 p-3 text-primary mb-2">
+                  <ImagePlus size={24} />
+                </div>
+                <p className="font-semibold text-text">Click to upload photos</p>
+                <p className="mt-1 text-xs text-text-light">JPG, PNG, WEBP (Max 5MB each)</p>
+                <input type="file" multiple accept="image/*" className="hidden" onChange={handleFileChange} />
+              </label>
+
+              {selectedFiles.length > 0 && (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {selectedFiles.map((file, idx) => (
+                    <div key={idx} className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-surface-alt">
+                      <img src={URL.createObjectURL(file)} alt="" className="h-full w-full object-cover" />
+                      {idx === 0 && (
+                        <span className="absolute left-2 top-2 rounded bg-primary px-1.5 py-0.5 text-[10px] font-bold text-white shadow">
+                          COVER
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeFile(idx)}
+                        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-transform hover:scale-110 hover:bg-danger"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -307,30 +386,44 @@ export default function SellProperty() {
           <div>
             <h2 className="mb-5 text-lg font-bold text-text">Preview your listing</h2>
             <div className="overflow-hidden rounded-2xl border border-border">
-              {form.images[0] && <img src={form.images[0]} alt="" className="h-56 w-full object-cover" />}
-              <div className="p-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  {form.propertyType && <Badge variant="primary" icon={Landmark}>{form.propertyType}</Badge>}
-                  <Badge variant={form.purpose === 'Rent' ? 'info' : 'success'}>For {form.purpose}</Badge>
-                  <Badge variant="neutral" icon={Sofa}>{FURNISHING_OPTIONS.find((f) => f.value === form.furnishing)?.label}</Badge>
+              <div className="bg-gradient-to-br from-primary/10 via-surface-alt to-surface p-6">
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  {form.propertyType && <Badge variant="primary" icon={Landmark}>{PROPERTY_TYPES.find((t) => t.value === form.propertyType)?.label || form.propertyType}</Badge>}
+                  <Badge variant={isRental ? 'info' : 'success'}>{LISTING_TYPES.find((t) => t.value === form.listingType)?.label || form.listingType}</Badge>
+                  <Badge variant="neutral" icon={Sofa}>{FURNISHING_STATUSES.find((f) => f.value === form.furnishingStatus)?.label}</Badge>
+                  {form.negotiable && <Badge variant="warning">Negotiable</Badge>}
                 </div>
-                <h3 className="mt-2 text-lg font-bold text-text">{form.title || 'Untitled listing'}</h3>
+                <h3 className="text-lg font-bold text-text">{form.title || 'Untitled listing'}</h3>
                 <p className="mt-1 flex items-center gap-1.5 text-sm text-text-secondary">
-                  <MapPin size={13} aria-hidden="true" /> {form.location}{form.location && form.city ? ', ' : ''}{form.city}
+                  <MapPin size={13} aria-hidden="true" /> {form.locality}{form.locality && form.city ? ', ' : ''}{form.city}
+                  {form.pincode && ` - ${form.pincode}`}
                 </p>
-                <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-text-secondary">
-                  {form.bedrooms !== '0' && (
+              </div>
+              <div className="p-5">
+                <div className="flex flex-wrap items-center gap-4 text-xs text-text-secondary">
+                  {form.bedrooms > 0 && (
                     <span className="flex items-center gap-1.5"><Bed size={14} aria-hidden="true" /> {form.bedrooms} BHK</span>
                   )}
-                  {form.bathrooms && (
+                  {Number(form.bathrooms) > 0 && (
                     <span className="flex items-center gap-1.5"><Bath size={14} aria-hidden="true" /> {form.bathrooms} Bath</span>
                   )}
-                  {form.area && (
-                    <span className="flex items-center gap-1.5"><Maximize size={14} aria-hidden="true" /> {form.area} sq.ft.</span>
+                  {Number(form.balconies) > 0 && (
+                    <span className="flex items-center gap-1.5">{form.balconies} Balcon{Number(form.balconies) > 1 ? 'ies' : 'y'}</span>
+                  )}
+                  {Number(form.builtUpArea) > 0 && (
+                    <span className="flex items-center gap-1.5"><Maximize size={14} aria-hidden="true" /> {form.builtUpArea} {AREA_UNITS.find((u) => u.value === form.areaUnit)?.label}</span>
+                  )}
+                  {Number(form.carpetArea) > 0 && (
+                    <span className="flex items-center gap-1.5"><Ruler size={14} aria-hidden="true" /> Carpet: {form.carpetArea} {AREA_UNITS.find((u) => u.value === form.areaUnit)?.label}</span>
+                  )}
+                  {form.facing && (
+                    <span className="flex items-center gap-1.5"><Compass size={14} aria-hidden="true" /> {FACING_OPTIONS.find((f) => f.value === form.facing)?.label}</span>
+                  )}
+                  {form.floor !== '' && (
+                    <span>Floor {form.floor}{form.totalFloors ? ` / ${form.totalFloors}` : ''}</span>
                   )}
                 </div>
                 <p className="mt-3 text-sm text-text-secondary">{form.description}</p>
-                {form.amenities && <p className="mt-2 text-xs text-text-light">Amenities: {form.amenities}</p>}
                 <p className="mt-4 text-2xl font-extrabold text-text">
                   {form.price ? formatCurrencyFull(Number(form.price)) : '—'}
                   {isRental && <span className="text-sm font-medium text-text-secondary">/month</span>}
@@ -344,9 +437,14 @@ export default function SellProperty() {
           <p className="text-xs text-text-secondary">
             {canSubmit ? 'All set — ready to submit.' : 'Complete the highlighted tabs before submitting.'}
           </p>
-          <Button variant="primary" icon={Rocket} disabled={!canSubmit} onClick={handlePublish}>
-            Submit for Review
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" disabled={!detailsValid || loading} onClick={handleSaveDraft}>
+              Save as Draft
+            </Button>
+            <Button variant="primary" icon={Rocket} disabled={!canSubmit || loading} onClick={handlePublish}>
+              {loading ? 'Submitting...' : 'Submit for Review'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

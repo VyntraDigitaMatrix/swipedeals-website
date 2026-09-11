@@ -1,15 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Calendar, FileText, Fuel, Gauge, Hash, Palette, Settings2, Shield, Users } from 'lucide-react'
+import { Calendar, Clock, FileText, Fuel, Gauge, Hash, Palette, Settings2, Shield, Users } from 'lucide-react'
 import DetailLayout from '../components/listing/DetailLayout'
 import Carousel from '../components/common/Carousel'
 import VehicleCard from '../components/vehicle/VehicleCard'
 import LoanCalculator from '../components/vehicle/LoanCalculator'
 import EmptyState from '../components/common/EmptyState'
-import { vehicleService, mapVehicleToCarCard } from '../services/publicListingService'
+import { vehicleService, mapVehicleToCarCard, extractImages } from '../services/publicListingService'
 import { usePublicImages } from '../hooks/usePublicImages'
 import { PLACEHOLDER_IMAGE } from '../utils/enumFormat'
-import { formatCurrencyFull } from '../utils/format'
+import { formatCurrencyFull, formatDate } from '../utils/format'
 
 export default function CarDetails() {
   const { id: slug } = useParams()
@@ -53,7 +53,8 @@ export default function CarDetails() {
     return () => { cancelled = true }
   }, [raw])
 
-  const images = usePublicImages(vehicleService.getImages, slug, [PLACEHOLDER_IMAGE])
+  const carImages = extractImages(raw)
+  const images = usePublicImages(vehicleService.getImages, slug, carImages)
 
   if (loading) {
     return <div className="container-page py-16 text-center text-sm text-text-secondary">Loading…</div>
@@ -67,20 +68,39 @@ export default function CarDetails() {
     )
   }
 
-  const car = { ...mapVehicleToCarCard(raw), images, location: '', color: raw.color }
+  const mapped = mapVehicleToCarCard(raw)
+  const car = {
+    ...mapped,
+    images: images.length > 0 && images[0] !== PLACEHOLDER_IMAGE ? images : carImages,
+    location: '',
+    color: raw.color || mapped.color,
+    sellerId: raw.seller?.sellerId || raw.sellerId || mapped.sellerId,
+    sellerName: raw.seller?.sellerName || raw.sellerName || mapped.sellerName,
+    sellerType: raw.seller?.sellerType || raw.sellerType || mapped.sellerType,
+    sellerEmail: raw.seller?.email,
+    sellerMobile: raw.seller?.mobileNumber,
+    seller: raw.seller,
+    rating: raw.seller?.averageRating ?? mapped.rating,
+    reviews: raw.seller?.totalReviews ?? mapped.reviews,
+  }
   const similar = similarRaw.map(mapVehicleToCarCard)
 
-  // Specs strictly mapped from user-vehicle-listing-controller fields
+  // Specs strictly mapped from public-vehicle-controller API fields
   const specItems = [
+    { label: 'Brand', value: car.brand, icon: Calendar },
+    { label: 'Model', value: raw.model, icon: FileText },
+    { label: 'Variant', value: raw.variant ? raw.variant.trim() : null, icon: Settings2 },
     { label: 'Year', value: car.year, icon: Calendar },
     { label: 'Odometer', value: car.km != null ? `${car.km.toLocaleString('en-IN')} km` : null, icon: Gauge },
     { label: 'Fuel Type', value: car.fuel, icon: Fuel },
     { label: 'Transmission', value: car.transmission, icon: Settings2 },
-    { label: 'Owners', value: car.owners ? `${car.owners} Owner${car.owners > 1 ? 's' : ''}` : 'First Owner', icon: Users },
+    { label: 'Owners', value: raw.ownersCount ? `${raw.ownersCount} Owner${raw.ownersCount > 1 ? 's' : ''}` : '1st Owner', icon: Users },
     { label: 'Colour', value: car.color, icon: Palette },
     { label: 'Reg. Number', value: raw.registrationNumber, icon: FileText },
     { label: 'Chassis No.', value: raw.chassisNumber, icon: Shield },
     { label: 'VIN', value: raw.vin, icon: Hash },
+    { label: 'Created At', value: formatDate(raw.createdAt), icon: Clock },
+    { label: 'Updated At', value: formatDate(raw.updatedAt), icon: Clock },
   ].filter((s) => s.value !== null && s.value !== undefined && s.value !== '')
 
   return (
@@ -89,7 +109,11 @@ export default function CarDetails() {
       breadcrumbLabel="Cars"
       breadcrumbTo="/cars"
       badges={[
-        { label: car.condition === 'new' ? 'New' : 'Used', variant: car.condition === 'new' ? 'success' : 'neutral' },
+        {
+          label: car.condition === 'new' ? 'New' : car.condition === 'like-new' ? 'Like New' : 'Used',
+          variant: car.condition === 'new' ? 'success' : car.condition === 'like-new' ? 'info' : 'neutral',
+        },
+        ...(raw.status ? [{ label: raw.status, variant: 'neutral' }] : []),
       ]}
       specs={specItems}
       description={

@@ -5,6 +5,7 @@ import EmptyState from '../components/common/EmptyState'
 import Badge from '../components/common/Badge'
 import Button from '../components/buttons/Button'
 import MixedListingCard from '../components/cards/MixedListingCard'
+import SellerReviewSection from '../components/seller/SellerReviewSection'
 import { useDealerApplications } from '../hooks/useDealerApplications'
 import { getListingsByDealerId, resolveDealerBySlug } from '../utils/dealerListings'
 
@@ -72,7 +73,7 @@ export default function DealerStorefront() {
         </div>
 
         {listings.length === 0 ? (
-          <div className="mb-16 flex flex-col items-center rounded-2xl border border-dashed border-border bg-surface-alt/40 py-16 text-center">
+          <div className="mb-12 flex flex-col items-center rounded-2xl border border-dashed border-border bg-surface-alt/40 py-16 text-center">
             <Store size={30} className="mb-4 text-text-light" aria-hidden="true" />
             <p className="font-semibold text-text">No listings published yet</p>
             <p className="mt-1 max-w-sm text-sm text-text-secondary">
@@ -80,7 +81,7 @@ export default function DealerStorefront() {
             </p>
           </div>
         ) : (
-          <div className="mb-16">
+          <div className="mb-12">
             <div className="no-scrollbar mb-6 flex gap-2 overflow-x-auto pb-1">
               <button
                 type="button"
@@ -112,6 +113,11 @@ export default function DealerStorefront() {
             </div>
           </div>
         )}
+
+        {/* Seller Reviews Section */}
+        <div className="mb-16">
+          <SellerReviewSection sellerId={dealer.id} sellerName={dealer.name} />
+        </div>
       </div>
     </div>
   )

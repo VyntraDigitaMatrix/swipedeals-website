@@ -1,15 +1,22 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertTriangle, Bell, Camera, Heart, Lock, LogIn, LogOut, Mail, MapPin, Phone, Settings, ShieldCheck, ShoppingBag, User } from 'lucide-react'
+import { 
+  AlertTriangle, Bell, Camera, Heart, Lock, LogIn, LogOut, Mail, 
+  MapPin, Phone, Settings, ShieldCheck, ShoppingBag, User, Star, Home
+} from 'lucide-react'
 import Breadcrumb from '../components/common/Breadcrumb'
 import Input from '../components/forms/Input'
 import Button from '../components/buttons/Button'
+import Badge from '../components/common/Badge'
 import { useAuth } from '../hooks/useAuth'
 import { useKyc } from '../hooks/useKyc'
+import { useUserProfile } from '../hooks/useUserProfile'
 import { cn } from '../utils/cn'
+import { titleCaseEnum } from '../utils/enumFormat'
 
 const TABS = [
   { id: 'profile', label: 'Profile Info', icon: User },
+  { id: 'addresses', label: 'Addresses', icon: MapPin },
   { id: 'listings', label: 'My Listings', icon: ShoppingBag },
   { id: 'wishlist', label: 'Wishlist', icon: Heart },
   { id: 'notifications', label: 'Notifications', icon: Bell },
@@ -20,6 +27,7 @@ export default function Profile() {
   const [tab, setTab] = useState('profile')
   const { user, isAuthenticated, logout } = useAuth()
   const { kyc, isKycVerified } = useKyc()
+  const { profile, loading } = useUserProfile()
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -47,6 +55,9 @@ export default function Profile() {
     )
   }
 
+  const displayName = profile?.fullName || user?.name || user?.phone || 'Account'
+  const displayPhone = profile?.mobileNumber || user?.phone || ''
+  
   return (
     <div className="container-page py-8">
       <Breadcrumb items={[{ label: 'Profile' }]} />
@@ -56,14 +67,23 @@ export default function Profile() {
           <div className="flex flex-col items-center border-b border-border pb-5 text-center">
             <div className="relative">
               <span className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-primary text-2xl font-black text-white">
-                {(user?.name || user?.phone || 'U').charAt(0).toUpperCase()}
+                {displayName.charAt(0).toUpperCase()}
               </span>
               <button type="button" aria-label="Change photo" className="absolute bottom-0 right-0 rounded-full bg-primary p-1.5 text-white shadow-soft">
                 <Camera size={12} aria-hidden="true" />
               </button>
             </div>
-            <p className="mt-3 font-bold text-text">{user?.name || (user?.phone ? `+91 ${user.phone}` : 'Account')}</p>
-            <p className="text-xs text-text-secondary">{user?.email || (user?.phone && `+91 ${user.phone}`)}</p>
+            <p className="mt-3 font-bold text-text">{displayName}</p>
+            <p className="text-xs text-text-secondary">{user?.email || (displayPhone && `+91 ${displayPhone}`)}</p>
+            
+            {profile?.role && (
+              <div className="mt-3 flex gap-2">
+                <Badge variant="primary">{titleCaseEnum(profile.role)}</Badge>
+                <Badge variant={profile.status === 'ACTIVE' ? 'success' : 'neutral'}>
+                  {titleCaseEnum(profile.status || 'ACTIVE')}
+                </Badge>
+              </div>
+            )}
           </div>
 
           <nav className="mt-4 flex flex-col gap-1">
@@ -93,16 +113,40 @@ export default function Profile() {
         </aside>
 
         <div className="rounded-2xl border border-border bg-surface p-6 shadow-soft sm:p-8">
-          {tab === 'profile' && (
+          {loading && tab === 'profile' ? (
+            <div className="text-center py-10 text-text-secondary">Loading profile...</div>
+          ) : tab === 'profile' ? (
             <div>
               <h2 className="mb-6 text-lg font-bold text-text">Profile Information</h2>
+              
+              <div className="mb-8 grid grid-cols-2 gap-4 rounded-xl border border-border bg-surface-alt/50 p-4 sm:grid-cols-4">
+                <div className="text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-text-light">Avg Rating</p>
+                  <p className="mt-1 flex justify-center items-center gap-1 font-mono text-xl font-bold text-text">
+                    {profile?.averageRating || 0} <Star size={16} className="text-warning fill-warning" />
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-text-light">Reviews</p>
+                  <p className="mt-1 font-mono text-xl font-bold text-text">{profile?.totalReviews || 0}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-text-light">Role</p>
+                  <p className="mt-1 font-bold text-text">{titleCaseEnum(profile?.role || 'USER')}</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-text-light">Status</p>
+                  <p className="mt-1 font-bold text-text">{titleCaseEnum(profile?.status || 'ACTIVE')}</p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <Input label="Full Name" icon={User} defaultValue={user?.name || ''} />
+                <Input label="Full Name" icon={User} defaultValue={profile?.fullName || ''} />
                 <Input
                   label="Mobile Number"
                   icon={Phone}
                   type="tel"
-                  defaultValue={user.phone ? `+91 ${user.phone}` : ''}
+                  defaultValue={displayPhone ? `+91 ${displayPhone}` : ''}
                   disabled
                   className="cursor-not-allowed opacity-60"
                   hint="Verified via OTP — contact support to change."
@@ -114,9 +158,30 @@ export default function Profile() {
                 Save Changes
               </Button>
             </div>
-          )}
-
-          {tab === 'listings' && (
+          ) : tab === 'addresses' ? (
+            <div>
+              <h2 className="mb-6 text-lg font-bold text-text">Saved Addresses</h2>
+              {profile?.addresses && profile.addresses.length > 0 ? (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {profile.addresses.map((address) => (
+                    <div key={address.id} className="relative rounded-xl border border-border p-4 bg-surface shadow-soft">
+                      <div className="mb-2 flex items-center justify-between">
+                        <Badge variant="primary" icon={Home}>{titleCaseEnum(address.addressType || 'HOME')}</Badge>
+                      </div>
+                      <p className="text-sm font-semibold text-text">{address.street}</p>
+                      <p className="mt-1 text-sm text-text-secondary">{address.city}, {address.state}</p>
+                      <p className="mt-1 text-sm text-text-secondary">{address.country} - {address.zipCode}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <MapPin size={32} className="mb-4 text-text-light" aria-hidden="true" />
+                  <p className="text-sm text-text-secondary">You haven&rsquo;t saved any addresses yet.</p>
+                </div>
+              )}
+            </div>
+          ) : tab === 'listings' ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <ShoppingBag size={32} className="mb-4 text-text-light" aria-hidden="true" />
               <p className="text-sm text-text-secondary">You haven&rsquo;t listed anything yet.</p>
@@ -124,9 +189,7 @@ export default function Profile() {
                 Create a Listing
               </Button>
             </div>
-          )}
-
-          {tab === 'wishlist' && (
+          ) : tab === 'wishlist' ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Heart size={32} className="mb-4 text-text-light" aria-hidden="true" />
               <p className="text-sm text-text-secondary">Manage your saved items on the dedicated wishlist page.</p>
@@ -134,9 +197,7 @@ export default function Profile() {
                 Go to Wishlist
               </Button>
             </div>
-          )}
-
-          {tab === 'notifications' && (
+          ) : tab === 'notifications' ? (
             <div>
               <h2 className="mb-6 text-lg font-bold text-text">Notification Preferences</h2>
               <div className="space-y-4">
@@ -148,21 +209,19 @@ export default function Profile() {
                 ))}
               </div>
             </div>
-          )}
-
-          {tab === 'security' && (
+          ) : tab === 'security' ? (
             <div>
               <h2 className="mb-6 flex items-center gap-2 text-lg font-bold text-text">
                 <Settings size={18} aria-hidden="true" /> Security Settings
               </h2>
 
-              {isKycVerified ? (
+              {isKycVerified || profile?.kyc?.status === 'VERIFIED' ? (
                 <div className="mb-4 flex items-start gap-3 rounded-xl border border-success/30 bg-success/5 p-4">
                   <ShieldCheck size={18} className="mt-0.5 shrink-0 text-success" aria-hidden="true" />
                   <div>
                     <p className="text-sm font-semibold text-text">KYC verified</p>
                     <p className="mt-1 text-xs text-text-secondary">
-                      Aadhaar &amp; PAN on file for <span className="font-semibold text-text">{kyc?.fullName}</span> &mdash; you can list
+                      Aadhaar &amp; PAN on file for <span className="font-semibold text-text">{profile?.kyc?.verifiedName || kyc?.fullName}</span> &mdash; you can list
                       products in any category.
                     </p>
                   </div>
@@ -188,7 +247,7 @@ export default function Profile() {
                   <p className="text-sm font-semibold text-text">OTP-secured account</p>
                   <p className="mt-1 text-xs text-text-secondary">
                     There&rsquo;s no password to manage — every login is verified with a one-time code sent to{' '}
-                    <span className="font-semibold text-text">+91 {user.phone}</span>.
+                    <span className="font-semibold text-text">+91 {displayPhone}</span>.
                   </p>
                 </div>
               </div>
@@ -196,7 +255,7 @@ export default function Profile() {
                 Log Out of This Device
               </Button>
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

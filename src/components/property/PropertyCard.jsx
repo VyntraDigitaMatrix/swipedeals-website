@@ -56,7 +56,7 @@ export default function PropertyCard({ property, index = 0 }) {
             <span className="line-clamp-1">{property.location}</span>
           </div>
         )}
-        {property.rating != null && <Rating value={property.rating} size={12} />}
+        {property.rating != null && property.rating > 0 && <Rating value={property.rating} size={12} className="mb-2" />}
 
         <div className="my-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-text-secondary">
           {property.bedrooms > 0 && (
@@ -69,9 +69,9 @@ export default function PropertyCard({ property, index = 0 }) {
               <Bath size={13} aria-hidden="true" /> {property.bathrooms} Baths
             </span>
           )}
-          {property.area && (
+          {property.area != null && (
             <span className="flex items-center gap-1">
-              <Ruler size={13} aria-hidden="true" /> {property.area} sqft
+              <Ruler size={13} aria-hidden="true" /> {property.area.toLocaleString('en-IN')} {property.areaUnit || 'sqft'}
             </span>
           )}
         </div>
@@ -82,7 +82,16 @@ export default function PropertyCard({ property, index = 0 }) {
               {formatCurrency(property.price)}
               {property.purpose === 'Rent' && <span className="text-xs font-medium text-text-secondary">/mo</span>}
             </p>
-            {dealer && <p className="line-clamp-1 max-w-[160px] text-[11px] font-semibold text-text-secondary">{dealer.name}</p>}
+            {(property.sellerName || dealer) && (
+              <div className="flex items-center gap-1">
+                <p className="line-clamp-1 max-w-[160px] text-[11px] font-semibold text-text-secondary">
+                  {property.sellerName || dealer?.name}
+                </p>
+                {(property.sellerType === 'ADMIN' || property.sellerType === 'DEALER' || dealer?.verified) && (
+                  <BadgeCheck size={12} className="shrink-0 text-info" aria-hidden="true" />
+                )}
+              </div>
+            )}
           </div>
         </div>
 

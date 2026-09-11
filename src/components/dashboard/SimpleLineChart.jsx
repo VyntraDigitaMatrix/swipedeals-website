@@ -52,16 +52,21 @@ export default function SimpleLineChart({ data, title, subtitle, color = 'var(--
         {points.map((p) => (
           <circle key={p.label} cx={p.x} cy={p.y} r={4} fill="var(--color-surface)" stroke={color} strokeWidth={2} />
         ))}
-        <motion.circle
-          cx={lastPoint.x}
-          cy={lastPoint.y}
-          r={7}
-          fill={color}
-          fillOpacity={0.15}
-          animate={{ r: [7, 11, 7] }}
-          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <circle cx={lastPoint.x} cy={lastPoint.y} r={4} fill={color} />
+        {lastPoint && (
+          <>
+            <motion.circle
+              cx={lastPoint.x}
+              cy={lastPoint.y}
+              r={7}
+              fill={color}
+              fillOpacity={0.15}
+              initial={{ r: 7 }}
+              animate={{ r: [7, 11, 7] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            />
+            <circle cx={lastPoint.x} cy={lastPoint.y} r={4} fill={color} />
+          </>
+        )}
       </svg>
       <div className="mt-2 flex justify-between px-1">
         {data.map((d) => (

@@ -625,34 +625,20 @@ function MobileMenu({ open, onClose, selectedCity, setSelectedCity }) {
                           transition={{ duration: 0.2 }}
                           className="overflow-hidden p-2 space-y-1.5 bg-surface"
                         >
-                          {link.dropdown.map((item) => {
-                            if (item.dropdown) {
-                              return <MobileNestedDropdown key={item.label} item={item} onClose={onClose} />
-                            }
-                            const IconComp = ITEM_ICONS[item.label] || Sparkles
-                            return (
+                          {link.dropdown.map((item) => (
+                            item.dropdown ? (
+                              <MobileNestedDropdown key={item.label} item={item} onClose={onClose} />
+                            ) : (
                               <Link
                                 key={item.label}
                                 to={item.to}
                                 onClick={onClose}
-                                className="flex items-start gap-3 rounded-xl p-2.5 transition-colors hover:bg-surface-alt group"
+                                className="block rounded-lg px-3.5 py-2 text-xs font-medium text-text-secondary hover:bg-surface-alt hover:text-primary"
                               >
-                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors mt-0.5">
-                                  <IconComp size={16} />
-                                </div>
-                                <div>
-                                  <p className="text-xs font-bold text-text group-hover:text-primary transition-colors">
-                                    {item.label}
-                                  </p>
-                                  {item.description && (
-                                    <p className="mt-0.5 text-[11px] leading-tight text-text-secondary line-clamp-1">
-                                      {item.description}
-                                    </p>
-                                  )}
-                                </div>
+                                {item.label}
                               </Link>
                             )
-                          })}
+                          ))}
                         </motion.div>
                       )}
                     </AnimatePresence>

@@ -13,92 +13,131 @@ import Badge from '../components/common/Badge'
 import SellAccessGate from '../components/common/SellAccessGate'
 import { useAuth } from '../hooks/useAuth'
 import { useKyc } from '../hooks/useKyc'
-import { useListingsStore } from '../hooks/useListingsStore'
-import { electronicsCategories } from '../data/electronics'
+import { useElectronicsListings } from '../hooks/useElectronicsListings'
+import electronicsListingService, { ELECTRONICS_TYPES, ELECTRONICS_CONDITIONS } from '../services/electronicsListingService'
 import { cn } from '../utils/cn'
 import { formatCurrencyFull } from '../utils/format'
 
-const ELECTRONICS_CATEGORY_OPTIONS = [...electronicsCategories, 'Other'].map((c) => ({ value: c, label: c }))
-const CONDITION_OPTIONS = [{ value: 'new', label: 'New / Sealed' }, { value: 'used', label: 'Used' }]
-const WARRANTY_OPTIONS = [
-  { value: 'none', label: 'No warranty' },
-  { value: 'manufacturer', label: 'Under manufacturer warranty' },
-  { value: 'extended', label: 'Extended / seller warranty' },
-]
-const BOX_OPTIONS = [{ value: 'yes', label: 'Yes, bill & box available' }, { value: 'no', label: 'No' }]
-
-const initialForm = (user) => ({
-  images: [],
-  electronicsCategory: '',
+const initialForm = () => ({
+  type: '',
   brand: '',
+  model: '',
   title: '',
-  condition: 'new',
-  specifications: '',
-  warranty: 'none',
-  billBoxAvailable: 'no',
+  condition: 'NEW',
+  purchaseYear: new Date().getFullYear(),
+  warrantyAvailable: false,
+  billAvailable: false,
+  boxAvailable: false,
   description: '',
-  originalPrice: '',
   price: '',
-  location: '',
+  negotiable: false,
   city: '',
-  sellerName: user?.name || '',
-  sellerPhone: user?.phone || '',
+  locality: '',
 })
 
 export default function SellElectronics() {
-  const { user, isAuthenticated } = useAuth()
+  const { isAuthenticated } = useAuth()
   const { isKycVerified } = useKyc()
-  const { addListing } = useListingsStore()
+  const { createListing, submitListing } = useElectronicsListings()
   const location = useLocation()
 
-  const [activeTab, setActiveTab] = useState('photos')
+  const [activeTab, setActiveTab] = useState('details')
   const [published, setPublished] = useState(false)
-  const [form, setForm] = useState(() => initialForm(user))
+  const [createdSlug, setCreatedSlug] = useState(null)
+  const [submitError, setSubmitError] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [form, setForm] = useState(initialForm)
+  const [selectedFiles, setSelectedFiles] = useState([])
 
   const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
 
-  const imagesValid = form.images.length > 0
-  const detailsValid = !!form.electronicsCategory && form.brand.trim().length > 1 && form.title.trim().length > 2 && form.description.trim().length > 5
+  const handleFileChange = (e) => {
+    if (e.target.files) {
+      setSelectedFiles((prev) => [...prev, ...Array.from(e.target.files)])
+    }
+  }
+
+  const removeFile = (index) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const detailsValid = !!form.type && form.brand.trim().length > 1 && form.title.trim().length > 2 && form.description.trim().length > 5
   const pricingValid = Number(form.price) > 0
-  const contactValid = form.sellerName.trim().length > 1 && /^\d{10}$/.test(form.sellerPhone) && form.location.trim().length > 2 && form.city.trim().length > 1
-  const canSubmit = imagesValid && detailsValid && pricingValid && contactValid
+  const imagesValid = selectedFiles.length > 0
+  const locationValid = form.city.trim().length > 1 && form.locality.trim().length > 2
+  const canSubmit = imagesValid && detailsValid && pricingValid && locationValid
 
   const TABS = [
-    { id: 'photos', label: 'Photos', valid: imagesValid },
     { id: 'details', label: 'Product Details', valid: detailsValid },
     { id: 'pricing', label: 'Pricing', valid: pricingValid },
-    { id: 'contact', label: 'Contact', valid: contactValid },
+    { id: 'location', label: 'Location', valid: locationValid },
+    { id: 'images', label: 'Photos', valid: imagesValid },
     { id: 'preview', label: 'Preview' },
   ]
 
-  const handleImageUpload = (e) => {
-    const files = Array.from(e.target.files || [])
-    const urls = files.map((f) => URL.createObjectURL(f))
-    update('images', [...form.images, ...urls].slice(0, 8))
+  const buildPayload = () => ({
+    title: form.title.trim(),
+    description: form.description.trim(),
+    type: form.type,
+    brand: form.brand.trim(),
+    model: form.model.trim(),
+    price: Number(form.price) || 0,
+    negotiable: form.negotiable,
+    condition: form.condition,
+    purchaseYear: Number(form.purchaseYear) || new Date().getFullYear(),
+    warrantyAvailable: form.warrantyAvailable,
+    billAvailable: form.billAvailable,
+    boxAvailable: form.boxAvailable,
+    city: form.city.trim(),
+    locality: form.locality.trim(),
+  })
+
+  const handlePublish = async () => {
+    if (!canSubmit) return
+    setSubmitError(null)
+    setLoading(true)
+    try {
+      // Step 1: Create Draft
+      const created = await createListing(buildPayload())
+      const slug = created?.slug
+      if (!slug) throw new Error('Could not get slug from created listing')
+
+      // Step 2: Upload Images
+      if (selectedFiles.length > 0) {
+        await electronicsListingService.uploadImages(slug, selectedFiles)
+      }
+
+      // Step 3: Submit for approval
+      await submitListing(slug)
+      setCreatedSlug(slug)
+      setPublished(true)
+    } catch (err) {
+      setSubmitError(err?.response?.data?.message || err?.message || 'Failed to submit listing.')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const handlePublish = () => {
-    if (!canSubmit) return
-    addListing({
-      category: 'electronics',
-      sellerType: 'individual',
-      sellerName: form.sellerName,
-      sellerPhone: form.sellerPhone,
-      title: form.title,
-      description: form.description,
-      condition: form.condition,
-      location: form.location,
-      city: form.city,
-      price: Number(form.price),
-      originalPrice: form.originalPrice ? Number(form.originalPrice) : undefined,
-      images: form.images,
-      electronicsCategory: form.electronicsCategory,
-      brand: form.brand,
-      specifications: form.specifications,
-      warranty: form.warranty,
-      billBoxAvailable: form.billBoxAvailable === 'yes',
-    })
-    setPublished(true)
+  const handleSaveDraft = async () => {
+    if (!detailsValid) return
+    setSubmitError(null)
+    setLoading(true)
+    try {
+      const created = await createListing(buildPayload())
+      const slug = created?.slug
+      
+      if (slug && selectedFiles.length > 0) {
+        await electronicsListingService.uploadImages(slug, selectedFiles)
+      }
+      
+      setCreatedSlug(slug)
+      setSubmitError(null)
+      alert('Draft saved successfully! You can submit it later from your dashboard.')
+    } catch (err) {
+      setSubmitError(err?.response?.data?.message || err?.message || 'Failed to save draft.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   if (published) {
@@ -125,8 +164,10 @@ export default function SellElectronics() {
             variant="outline"
             onClick={() => {
               setPublished(false)
-              setActiveTab('photos')
-              setForm(initialForm(user))
+              setActiveTab('details')
+              setForm(initialForm())
+              setSelectedFiles([])
+              setCreatedSlug(null)
             }}
           >
             List Another Item
@@ -185,39 +226,49 @@ export default function SellElectronics() {
       </div>
 
       <div className="mx-auto max-w-2xl rounded-2xl border border-border bg-surface p-6 shadow-soft sm:p-8">
-        {activeTab === 'photos' && (
-          <div>
-            <h2 className="mb-5 text-lg font-bold text-text">Upload photos</h2>
-            <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border p-10 text-center hover:border-primary/40">
-              <Upload size={28} className="text-text-light" aria-hidden="true" />
-              <span className="text-sm font-semibold text-text">Click to upload or drag and drop</span>
-              <span className="text-xs text-text-light">PNG, JPG up to 10MB (max 8 photos) &mdash; include the screen, ports &amp; any scratches</span>
-              <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
-            </label>
+        {submitError && (
+          <div className="mb-6 rounded-lg bg-danger/10 p-4 text-sm font-semibold text-danger">
+            {submitError}
+          </div>
+        )}
 
-            {form.images.length > 0 && (
-              <div className="mt-5 grid grid-cols-4 gap-3">
-                {form.images.map((src, i) => (
-                  <div key={src} className="group relative aspect-square overflow-hidden rounded-lg">
-                    <img src={src} alt="" className="h-full w-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => update('images', form.images.filter((_, idx) => idx !== i))}
-                      aria-label="Remove photo"
-                      className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
-                    >
-                      <X size={12} aria-hidden="true" />
-                    </button>
-                  </div>
-                ))}
-                {form.images.length < 8 && (
-                  <label className="flex aspect-square cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border text-text-light hover:border-primary/40">
-                    <ImagePlus size={20} aria-hidden="true" />
-                    <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
-                  </label>
-                )}
-              </div>
-            )}
+        {activeTab === 'images' && (
+          <div className="space-y-5">
+            <h2 className="text-lg font-bold text-text">Photos</h2>
+            <p className="-mt-3 text-xs text-text-secondary">Upload high quality photos of the product to get more inquiries. The first photo will be the main cover image.</p>
+            
+            <div className="flex flex-col gap-4">
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-surface-alt py-10 transition-colors hover:border-primary hover:bg-primary/5">
+                <div className="rounded-full bg-primary/10 p-3 text-primary mb-2">
+                  <ImagePlus size={24} />
+                </div>
+                <p className="font-semibold text-text">Click to upload photos</p>
+                <p className="mt-1 text-xs text-text-light">JPG, PNG, WEBP</p>
+                <input type="file" multiple accept="image/*" className="hidden" onChange={handleFileChange} />
+              </label>
+
+              {selectedFiles.length > 0 && (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {selectedFiles.map((file, idx) => (
+                    <div key={idx} className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-surface-alt">
+                      <img src={URL.createObjectURL(file)} alt="" className="h-full w-full object-cover" />
+                      {idx === 0 && (
+                        <span className="absolute left-2 top-2 rounded bg-primary px-1.5 py-0.5 text-[10px] font-bold text-white shadow">
+                          COVER
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeFile(idx)}
+                        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-transform hover:scale-110 hover:bg-danger"
+                      >
+                        <X size={14} aria-hidden="true" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -225,53 +276,54 @@ export default function SellElectronics() {
           <div className="space-y-5">
             <h2 className="text-lg font-bold text-text">Product details</h2>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Dropdown label="Category" value={form.electronicsCategory} onChange={(v) => update('electronicsCategory', v)} placeholder="Select category" options={ELECTRONICS_CATEGORY_OPTIONS} />
-              <Input label="Brand" icon={Tag} placeholder="e.g. Apple, Samsung, Sony" value={form.brand} onChange={(e) => update('brand', e.target.value)} />
+              <Dropdown label="Category" value={form.type} onChange={(v) => update('type', v)} placeholder="Select category" options={ELECTRONICS_TYPES} />
+              <Dropdown label="Condition" value={form.condition} onChange={(v) => update('condition', v)} options={ELECTRONICS_CONDITIONS} />
             </div>
-            <Input label="Model / Title" icon={Laptop} placeholder="e.g. Apple iPhone 15 Pro Max 256GB" value={form.title} onChange={(e) => update('title', e.target.value)} />
-            <TextArea
-              label="Key Specifications"
-              placeholder="e.g. 256GB storage, 8GB RAM, 6.7&quot; display, 1 year old"
-              value={form.specifications}
-              onChange={(e) => update('specifications', e.target.value)}
-              hint="RAM/storage, size, capacity, model year — whatever's relevant for this category."
-              rows={3}
-            />
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <Dropdown label="Condition" value={form.condition} onChange={(v) => update('condition', v)} options={CONDITION_OPTIONS} />
-              <Dropdown label="Warranty Status" value={form.warranty} onChange={(v) => update('warranty', v)} options={WARRANTY_OPTIONS} />
+              <Input label="Brand" icon={Tag} placeholder="e.g. Apple, Samsung" value={form.brand} onChange={(e) => update('brand', e.target.value)} />
+              <Input label="Model" placeholder="e.g. iPhone 15 Pro Max" value={form.model} onChange={(e) => update('model', e.target.value)} />
             </div>
-            <Dropdown label="Bill & Original Box" value={form.billBoxAvailable} onChange={(v) => update('billBoxAvailable', v)} options={BOX_OPTIONS} />
-            <TextArea label="Description" placeholder="Describe condition, usage, accessories included, reason for selling..." value={form.description} onChange={(e) => update('description', e.target.value)} />
+            <Input label="Listing Title" icon={Laptop} placeholder="e.g. Apple iPhone 15 Pro Max 256GB" value={form.title} onChange={(e) => update('title', e.target.value)} />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input label="Purchase Year" type="number" min="2000" max={new Date().getFullYear()} value={form.purchaseYear} onChange={(e) => update('purchaseYear', e.target.value)} />
+            </div>
+            <div className="flex flex-wrap gap-6 text-sm text-text">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.warrantyAvailable} onChange={(e) => update('warrantyAvailable', e.target.checked)} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
+                Under Warranty
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.billAvailable} onChange={(e) => update('billAvailable', e.target.checked)} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
+                Original Bill Available
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={form.boxAvailable} onChange={(e) => update('boxAvailable', e.target.checked)} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
+                Original Box Available
+              </label>
+            </div>
+            <TextArea label="Description" placeholder="Describe condition, usage, accessories included, reason for selling..." value={form.description} onChange={(e) => update('description', e.target.value)} rows={4} />
           </div>
         )}
 
         {activeTab === 'pricing' && (
           <div className="space-y-5">
             <h2 className="text-lg font-bold text-text">Pricing</h2>
-            <Input label="MRP / Original Price (₹) — optional" type="number" placeholder="e.g. 159900" value={form.originalPrice} onChange={(e) => update('originalPrice', e.target.value)} hint="Shown as a strike-through so buyers see the discount." />
             <Input label="Selling Price (₹)" type="number" placeholder="e.g. 139900" value={form.price} onChange={(e) => update('price', e.target.value)} />
+            <label className="flex items-center gap-2 text-sm text-text">
+              <input type="checkbox" checked={form.negotiable} onChange={(e) => update('negotiable', e.target.checked)} className="h-4 w-4 rounded border-border text-primary focus:ring-primary" />
+              Price is negotiable
+            </label>
           </div>
         )}
 
-        {activeTab === 'contact' && (
+        {activeTab === 'location' && (
           <div className="space-y-5">
-            <h2 className="text-lg font-bold text-text">Contact &amp; location</h2>
-            <p className="-mt-3 text-xs text-text-secondary">Shown to buyers so they can reach you directly once your listing is approved.</p>
-            <div className="grid grid-cols-2 gap-4">
-              <Input label="Your Name" icon={User} placeholder="e.g. Rohan Mehta" value={form.sellerName} onChange={(e) => update('sellerName', e.target.value)} />
-              <Input
-                label="Phone Number"
-                icon={Phone}
-                type="tel"
-                placeholder="98765 43210"
-                maxLength={10}
-                value={form.sellerPhone}
-                onChange={(e) => update('sellerPhone', e.target.value.replace(/\D/g, '').slice(0, 10))}
-              />
+            <h2 className="text-lg font-bold text-text">Location details</h2>
+            <p className="-mt-3 text-xs text-text-secondary">Where is this item located?</p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Input label="City *" icon={MapPin} placeholder="e.g. Mumbai" value={form.city} onChange={(e) => update('city', e.target.value)} />
+              <Input label="Locality / Area *" icon={MapPin} placeholder="e.g. Andheri West" value={form.locality} onChange={(e) => update('locality', e.target.value)} />
             </div>
-            <Input label="Area / Locality" icon={MapPin} placeholder="e.g. Nehru Place" value={form.location} onChange={(e) => update('location', e.target.value)} />
-            <Input label="City" placeholder="e.g. Delhi" value={form.city} onChange={(e) => update('city', e.target.value)} />
           </div>
         )}
 
@@ -279,24 +331,30 @@ export default function SellElectronics() {
           <div>
             <h2 className="mb-5 text-lg font-bold text-text">Preview your listing</h2>
             <div className="overflow-hidden rounded-2xl border border-border">
-              {form.images[0] && <img src={form.images[0]} alt="" className="h-56 w-full object-cover" />}
-              <div className="p-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  {form.electronicsCategory && <Badge variant="info" icon={Laptop}>{form.electronicsCategory}</Badge>}
-                  {form.brand && <Badge variant="neutral">{form.brand}</Badge>}
-                  <Badge variant={form.condition === 'new' ? 'success' : 'neutral'}>{form.condition === 'new' ? 'New' : 'Used'}</Badge>
-                  {form.billBoxAvailable === 'yes' && <Badge variant="primary" icon={Package}>Bill &amp; Box</Badge>}
+              <div className="bg-gradient-to-br from-primary/10 via-surface-alt to-surface p-6">
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <Badge variant="primary" icon={Laptop}>{ELECTRONICS_TYPES.find(t => t.value === form.type)?.label || form.type || 'Electronics'}</Badge>
+                  <Badge variant="neutral">{ELECTRONICS_CONDITIONS.find(c => c.value === form.condition)?.label || form.condition}</Badge>
+                  {form.warrantyAvailable && <Badge variant="success" icon={ShieldCheck}>Warranty Available</Badge>}
+                  {form.negotiable && <Badge variant="warning">Negotiable</Badge>}
                 </div>
-                <h3 className="mt-2 text-lg font-bold text-text">{form.title || 'Untitled listing'}</h3>
-                {form.specifications && <p className="mt-1 text-xs text-text-secondary">{form.specifications}</p>}
+                <h3 className="text-lg font-bold text-text">{form.title || 'Untitled listing'}</h3>
                 <p className="mt-1 flex items-center gap-1.5 text-sm text-text-secondary">
-                  <MapPin size={13} aria-hidden="true" /> {form.location}{form.location && form.city ? ', ' : ''}{form.city}
+                  {form.brand} • {form.model} • Bought in {form.purchaseYear}
                 </p>
-                <p className="mt-3 text-sm text-text-secondary">{form.description}</p>
-                <div className="mt-4 flex items-baseline gap-2">
-                  <p className="text-2xl font-extrabold text-text">{form.price ? formatCurrencyFull(Number(form.price)) : '—'}</p>
-                  {form.originalPrice && <p className="text-sm text-text-light line-through">{formatCurrencyFull(Number(form.originalPrice))}</p>}
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-text-secondary">
+                  <MapPin size={13} aria-hidden="true" /> {form.locality}{form.locality && form.city ? ', ' : ''}{form.city}
+                </p>
+              </div>
+              <div className="p-5">
+                <div className="flex flex-wrap items-center gap-4 text-xs text-text-secondary">
+                  {form.billAvailable && <span className="flex items-center gap-1.5"><Check size={14} /> Bill Available</span>}
+                  {form.boxAvailable && <span className="flex items-center gap-1.5"><Package size={14} /> Box Available</span>}
                 </div>
+                <p className="mt-3 text-sm text-text-secondary">{form.description}</p>
+                <p className="mt-4 text-2xl font-extrabold text-text">
+                  {form.price ? formatCurrencyFull(Number(form.price)) : '—'}
+                </p>
               </div>
             </div>
           </div>
@@ -306,9 +364,14 @@ export default function SellElectronics() {
           <p className="text-xs text-text-secondary">
             {canSubmit ? 'All set — ready to submit.' : 'Complete the highlighted tabs before submitting.'}
           </p>
-          <Button variant="primary" icon={Rocket} disabled={!canSubmit} onClick={handlePublish}>
-            Submit for Review
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" disabled={!detailsValid || loading} onClick={handleSaveDraft}>
+              Save as Draft
+            </Button>
+            <Button variant="primary" icon={Rocket} disabled={!canSubmit || loading} onClick={handlePublish}>
+              {loading ? 'Submitting...' : 'Submit for Review'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

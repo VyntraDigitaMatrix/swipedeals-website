@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Package, Wrench } from 'lucide-react'
+import { Calendar, Clock, Layers, Package, Shield, Tag, Wrench } from 'lucide-react'
 import DetailLayout from '../components/listing/DetailLayout'
 import SparePartCard from '../components/cards/SparePartCard'
 import EmptyState from '../components/common/EmptyState'
-import { sparePartsService, mapSparePartToCard } from '../services/publicListingService'
+import { sparePartsService, mapSparePartToCard, extractImages } from '../services/publicListingService'
 import { usePublicImages } from '../hooks/usePublicImages'
-import { PLACEHOLDER_IMAGE } from '../utils/enumFormat'
-import { formatCurrencyFull } from '../utils/format'
+import { PLACEHOLDER_IMAGE, titleCaseEnum } from '../utils/enumFormat'
+import { formatCurrencyFull, formatDate } from '../utils/format'
 
 export default function SparePartDetails() {
   const { id: slug } = useParams()
@@ -51,7 +51,8 @@ export default function SparePartDetails() {
     return () => { cancelled = true }
   }, [raw])
 
-  const images = usePublicImages(sparePartsService.getImages, slug, [PLACEHOLDER_IMAGE])
+  const partImages = extractImages(raw)
+  const images = usePublicImages(sparePartsService.getImages, slug, partImages)
 
   if (loading) {
     return <div className="container-page py-16 text-center text-sm text-text-secondary">Loading…</div>
@@ -65,12 +66,37 @@ export default function SparePartDetails() {
     )
   }
 
-  const part = { ...mapSparePartToCard(raw), images, location: '' }
+  const mapped = mapSparePartToCard(raw)
+  const part = {
+    ...mapped,
+    images: images.length > 0 && images[0] !== PLACEHOLDER_IMAGE ? images : partImages,
+    location: '',
+    sellerId: raw.seller?.sellerId || raw.sellerId || mapped.sellerId,
+    sellerName: raw.seller?.sellerName || raw.sellerName || mapped.sellerName,
+    sellerType: raw.seller?.sellerType || raw.sellerType || mapped.sellerType,
+    sellerEmail: raw.seller?.email,
+    sellerMobile: raw.seller?.mobileNumber,
+    seller: raw.seller,
+    rating: raw.seller?.averageRating ?? mapped.rating,
+    reviews: raw.seller?.totalReviews ?? mapped.reviews,
+  }
   const similar = similarRaw.map(mapSparePartToCard)
 
-  const compatibleWith = [raw.compatibleVehicleBrand, raw.compatibleVehicleModel, raw.compatibleVehicleVariant]
-    .filter(Boolean)
-    .join(' ')
+  const specItems = [
+    { label: 'Brand', value: raw.brand, icon: Package },
+    { label: 'Part Number', value: raw.partNumber, icon: Tag },
+    { label: 'Category', value: raw.category ? titleCaseEnum(raw.category) : null, icon: Wrench },
+    { label: 'Sub Category', value: raw.subCategory, icon: Layers },
+    { label: 'Condition', value: raw.condition === 'NEW' ? 'New' : 'Used', icon: Shield },
+    { label: 'Negotiable', value: raw.negotiable != null ? (raw.negotiable ? 'Yes' : 'No') : null },
+    { label: 'Compatible Brand', value: raw.compatibleVehicleBrand },
+    { label: 'Compatible Model', value: raw.compatibleVehicleModel },
+    { label: 'Compatible Variant', value: raw.compatibleVehicleVariant },
+    { label: 'Source', value: raw.listingSource ? titleCaseEnum(raw.listingSource) : null },
+    { label: 'Status', value: raw.status ? titleCaseEnum(raw.status) : null },
+    { label: 'Created At', value: formatDate(raw.createdAt), icon: Clock },
+    { label: 'Updated At', value: formatDate(raw.updatedAt), icon: Clock },
+  ].filter((s) => s.value !== null && s.value !== undefined && s.value !== '')
 
   return (
     <DetailLayout
@@ -78,15 +104,11 @@ export default function SparePartDetails() {
       breadcrumbLabel="Spare Parts"
       breadcrumbTo="/spare-parts"
       badges={[
-        { label: part.category, variant: 'neutral', icon: Wrench },
+        { label: raw.condition === 'NEW' ? 'New' : 'Used', variant: raw.condition === 'NEW' ? 'success' : 'neutral' },
+        ...(raw.category ? [{ label: titleCaseEnum(raw.category), variant: 'neutral', icon: Wrench }] : []),
+        ...(raw.listingSource ? [{ label: titleCaseEnum(raw.listingSource), variant: 'neutral' }] : []),
       ]}
-      specs={[
-        { label: 'Brand', value: part.brand, icon: Package },
-        { label: 'Category', value: part.category, icon: Wrench },
-        { label: 'Condition', value: raw.condition === 'NEW' ? 'New' : 'Used' },
-        { label: 'Part Number', value: raw.partNumber },
-        { label: 'Compatible With', value: compatibleWith || null },
-      ].filter((s) => s.value !== null && s.value !== undefined && s.value !== '')}
+      specs={specItems}
       description={
         raw.description ||
         `${part.brand ? `Genuine ${part.brand} ` : ''}${part.title}, listed on the SwipeDeals marketplace. Contact the seller directly to confirm fitment and availability.`
@@ -94,7 +116,7 @@ export default function SparePartDetails() {
       priceBlock={
         <div>
           <p className="text-3xl font-extrabold text-text">{formatCurrencyFull(part.price)}</p>
-          {raw.negotiable && <p className="mt-1 text-sm text-text-secondary">Price negotiable</p>}
+          {raw.negotiable && <p className="mt-1 text-sm font-medium text-success">Price negotiable</p>}
         </div>
       }
       similar={

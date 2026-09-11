@@ -29,6 +29,11 @@ export default function SparePartCard({ part, index = 0 }) {
       <Link to={`/spare-parts/${part.id}`} className="relative block aspect-square overflow-hidden bg-surface-alt">
         <img src={images[0]} alt={part.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
         <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+          {part.condition && (
+            <Badge variant={part.condition === 'new' ? 'success' : 'neutral'} className="bg-white/95">
+              {part.condition === 'new' ? 'New' : 'Used'}
+            </Badge>
+          )}
           {discount > 0 && (
             <Badge variant="danger" icon={TagIcon} className="bg-white/95">
               {discount}% OFF
@@ -44,17 +49,24 @@ export default function SparePartCard({ part, index = 0 }) {
       </Link>
 
       <div className="flex flex-1 flex-col p-4">
-        <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-secondary">{part.category} &middot; {part.brand}</p>
+        <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wide text-secondary">
+          {part.category || 'Spare Part'} &middot; {part.brand}
+        </p>
         <Link to={`/spare-parts/${part.id}`} className="mb-1 line-clamp-1 text-[15px] font-bold text-text hover:text-primary">
           {part.title}
         </Link>
+        {part.partNumber && (
+          <p className="mb-1.5 text-xs text-text-secondary">
+            Part No: <span className="font-semibold text-text">{part.partNumber}</span>
+          </p>
+        )}
         {part.location && (
           <div className="mb-2 flex items-center gap-1.5 text-xs text-text-secondary">
             <MapPin size={12} className="shrink-0" aria-hidden="true" />
             <span className="line-clamp-1">{part.location}</span>
           </div>
         )}
-        {part.rating != null && <Rating value={part.rating} size={12} />}
+        {part.rating != null && part.rating > 0 && <Rating value={part.rating} size={12} className="mb-2" />}
 
         <div className="mt-auto flex items-end justify-between border-t border-border pt-3">
           <div>
@@ -62,7 +74,16 @@ export default function SparePartCard({ part, index = 0 }) {
               <p className="text-lg font-extrabold text-text">{formatCurrencyFull(part.price)}</p>
               {part.originalPrice && <p className="text-xs text-text-light line-through">{formatCurrencyFull(part.originalPrice)}</p>}
             </div>
-            {dealer && <p className="line-clamp-1 max-w-[140px] text-[11px] font-semibold text-text-secondary">{dealer.name}</p>}
+            {(part.sellerName || dealer) && (
+              <div className="flex items-center gap-1">
+                <p className="line-clamp-1 max-w-[140px] text-[11px] font-semibold text-text-secondary">
+                  {part.sellerName || dealer?.name}
+                </p>
+                {(part.sellerType === 'ADMIN' || part.sellerType === 'DEALER' || dealer?.verified) && (
+                  <BadgeCheck size={12} className="shrink-0 text-info" aria-hidden="true" />
+                )}
+              </div>
+            )}
           </div>
         </div>
 

@@ -3,10 +3,9 @@ import { useEffect, useState } from 'react'
 /**
  * Fetches a listing's real photo gallery by slug from one of the public
  * `*Service.getImages(slug)` functions and returns an array of image URLs,
- * primary photo first. Returns `fallback` (e.g. the placeholder array the
- * card mappers produce) while the request is in flight, on error, or when
- * the listing has no uploaded photos yet — so callers never have to branch
- * on a loading/empty state themselves.
+ * primary photo first. Returns `fallback` while the request is in flight, on
+ * error, or when the listing has no uploaded photos yet. If API images exist,
+ * only the API images are displayed.
  */
 export function usePublicImages(fetchImages, slug, fallback) {
   const [images, setImages] = useState(fallback)
@@ -21,23 +20,36 @@ export function usePublicImages(fetchImages, slug, fallback) {
     fetchImages(slug)
       .then((res) => {
         if (cancelled) return
-        const list = res?.data
-        if (!Array.isArray(list) || list.length === 0) return
+        const list = Array.isArray(res?.data)
+          ? res.data
+          : Array.isArray(res?.data?.data)
+          ? res.data.data
+          : Array.isArray(res?.data?.content)
+          ? res.data.content
+          : Array.isArray(res)
+          ? res
+          : []
+        if (!list || list.length === 0) return
 
-        const ordered = [...list].sort((a, b) => Number(Boolean(b.isPrimary)) - Number(Boolean(a.isPrimary)))
-        const urls = ordered.map((img) => img.imageUrl).filter(Boolean)
-        if (urls.length) setImages(urls)
+        const ordered = [...list].sort(
+          (a, b) =>
+            Number(Boolean(b?.isPrimary)) - Number(Boolean(a?.isPrimary)) ||
+            (a?.displayOrder || 0) - (b?.displayOrder || 0)
+        )
+        const urls = ordered.map((img) => (typeof img === 'string' ? img : img?.imageUrl)).filter(Boolean)
+        
+        // If API images exist, use only API images (do not append fallback URLs)
+        if (urls.length > 0) {
+          setImages(urls)
+        }
       })
       .catch(() => {
-        // Keep the fallback image — a missing gallery shouldn't break the card/page.
+        // Keep fallback images on error
       })
 
     return () => {
       cancelled = true
     }
-    // Re-fetch only when the listing (or the endpoint used) changes; `fallback`
-    // is applied synchronously above and intentionally isn't a dependency.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchImages, slug])
 
   return images

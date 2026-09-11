@@ -28,8 +28,11 @@ export default function CommercialVehicleCard({ vehicle, index = 0 }) {
       <Link to={`/commercial-vehicles/${vehicle.id}`} className="relative block aspect-[4/3] overflow-hidden bg-surface-alt">
         <img src={images[0]} alt={vehicle.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
         <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
-          <Badge variant={vehicle.condition === 'new' ? 'success' : 'neutral'} className="bg-white/95">
-            {vehicle.condition === 'new' ? 'New' : 'Used'}
+          <Badge
+            variant={vehicle.condition === 'new' ? 'success' : vehicle.condition === 'like-new' ? 'info' : 'neutral'}
+            className="bg-white/95"
+          >
+            {vehicle.condition === 'new' ? 'New' : vehicle.condition === 'like-new' ? 'Like New' : 'Used'}
           </Badge>
           {vehicle.verified && (
             <Badge variant="info" icon={BadgeCheck} className="bg-white/95">
@@ -50,7 +53,7 @@ export default function CommercialVehicleCard({ vehicle, index = 0 }) {
             <span className="line-clamp-1">{vehicle.location}</span>
           </div>
         )}
-        {vehicle.rating != null && <Rating value={vehicle.rating} size={12} />}
+        {vehicle.rating != null && vehicle.rating > 0 && <Rating value={vehicle.rating} size={12} />}
 
         <div className="my-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-text-secondary">
           {vehicle.capacity && (
@@ -59,7 +62,7 @@ export default function CommercialVehicleCard({ vehicle, index = 0 }) {
             </span>
           )}
           <span className="flex items-center gap-1">
-            <Gauge size={13} aria-hidden="true" /> {formatKm(vehicle.km)}
+            <Gauge size={13} aria-hidden="true" /> {formatKm(vehicle.km ?? vehicle.mileage)}
           </span>
           <Badge variant="neutral">{vehicle.type}</Badge>
         </div>
@@ -69,7 +72,18 @@ export default function CommercialVehicleCard({ vehicle, index = 0 }) {
             <p className="text-lg font-extrabold text-text">{formatCurrency(vehicle.price)}</p>
             {vehicle.emi != null && <p className="text-[11px] text-text-secondary">EMI from {formatCurrency(vehicle.emi)}/mo</p>}
           </div>
-          {dealer && <p className="line-clamp-1 max-w-[110px] text-right text-[11px] font-semibold text-text-secondary">{dealer.name}</p>}
+          {(vehicle.sellerName || dealer) && (
+            <div className="flex min-w-0 flex-col items-end text-right">
+              <div className="flex items-center gap-1">
+                <p className="line-clamp-1 max-w-[110px] text-[11px] font-semibold text-text-secondary">
+                  {vehicle.sellerName || dealer?.name}
+                </p>
+                {(vehicle.sellerType === 'ADMIN' || vehicle.sellerType === 'DEALER' || dealer?.verified) && (
+                  <BadgeCheck size={12} className="shrink-0 text-info" aria-hidden="true" />
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mt-3 flex items-center gap-2">
