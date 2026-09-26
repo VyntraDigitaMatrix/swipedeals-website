@@ -42,7 +42,7 @@ export default function PropertyCard({ property, index = 0 }) {
             </Badge>
           )}
         </div>
-        <WishlistButton id={property.id} className="absolute right-3 top-3" />
+        <WishlistButton slug={property.slug ?? property.id} category="property" className="absolute right-3 top-3" />
       </Link>
 
       <div className="flex flex-1 flex-col p-4">

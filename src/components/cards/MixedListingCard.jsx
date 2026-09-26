@@ -24,7 +24,7 @@ export default function MixedListingCard({ item, index = 0 }) {
         <Badge variant="dark" className="absolute left-3 top-3 bg-black/60 backdrop-blur-sm">
           {item.categoryLabel}
         </Badge>
-        <WishlistButton id={item.id} className="absolute right-3 top-3" />
+        <WishlistButton slug={item.slug ?? item.id} category={item.category} className="absolute right-3 top-3" />
       </Link>
       <div className="flex flex-1 flex-col p-4">
         <Link to={item.detailPath} className="mb-1 line-clamp-1 text-[15px] font-bold text-text hover:text-primary">

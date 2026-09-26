@@ -45,7 +45,7 @@ export default function SparePartCard({ part, index = 0 }) {
             </Badge>
           )}
         </div>
-        <WishlistButton id={part.id} className="absolute right-3 top-3" />
+        <WishlistButton slug={part.slug ?? part.id} category="spare-parts" className="absolute right-3 top-3" />
       </Link>
 
       <div className="flex flex-1 flex-col p-4">

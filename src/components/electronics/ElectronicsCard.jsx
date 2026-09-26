@@ -40,7 +40,7 @@ export default function ElectronicsCard({ item, index = 0 }) {
             </Badge>
           )}
         </div>
-        <WishlistButton id={item.id} className="absolute right-3 top-3" />
+        <WishlistButton slug={item.slug ?? item.id} category="electronics" className="absolute right-3 top-3" />
       </Link>
 
       <div className="flex flex-1 flex-col p-4">

@@ -55,7 +55,7 @@ export default function VehicleCard({ car, index = 0 }) {
             </Badge>
           )}
         </div>
-        <WishlistButton id={car.id} className="absolute right-3 top-3" />
+        <WishlistButton slug={car.slug ?? car.id} category="vehicles" className="absolute right-3 top-3" />
 
         {images.length > 1 && (
           <span className="absolute bottom-2.5 right-3 flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">

@@ -345,6 +345,111 @@ function NavDropdown({ link }) {
   )
 }
 
+/**
+ * NavSubDropdown — renders a top-level "More" category item (e.g. Electronics,
+ * Spare Parts, Services) that has its own nested dropdown of sub-links.
+ * Shows the parent row with icon + description, and a fly-out panel on hover.
+ */
+function NavSubDropdown({ item, setOpen: setParentOpen }) {
+  const [subOpen, setSubOpen] = useState(false)
+  const ref = useRef(null)
+  useOnClickOutside(ref, () => setSubOpen(false))
+  const IconComponent = ITEM_ICONS[item.label] || Sparkles
+
+  // Description for the parent row based on its children
+  const parentDescriptions = {
+    'Electronics': 'Mobiles, laptops, TVs & more',
+    'Spare Parts': 'Genuine & aftermarket parts',
+    'Services': 'Finance, insurance & vehicle info',
+  }
+  const parentDesc = parentDescriptions[item.label] || ''
+
+  return (
+    <div
+      ref={ref}
+      className="relative"
+      onMouseEnter={() => setSubOpen(true)}
+      onMouseLeave={() => setSubOpen(false)}
+    >
+      {/* Parent row — looks like a normal dropdown item but has a chevron */}
+      <button
+        type="button"
+        onClick={() => setSubOpen((v) => !v)}
+        className="flex w-full items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-surface-alt group text-left"
+      >
+        <div className={cn(
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors mt-0.5',
+          subOpen ? 'bg-primary text-white' : 'bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white'
+        )}>
+          <IconComponent size={16} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className={cn('text-xs font-bold transition-colors', subOpen ? 'text-primary' : 'text-text group-hover:text-primary')}>
+            {item.label}
+          </p>
+          {parentDesc && (
+            <p className="mt-0.5 text-[11px] leading-tight text-text-secondary line-clamp-1">
+              {parentDesc}
+            </p>
+          )}
+        </div>
+        <ChevronDown
+          size={12}
+          className={cn('shrink-0 text-text-secondary transition-transform duration-200 -rotate-90', subOpen && 'rotate-0 text-primary')}
+          aria-hidden="true"
+        />
+      </button>
+
+      {/* Sub-items fly-out panel */}
+      <AnimatePresence>
+        {subOpen && (
+          <motion.div
+            initial={{ opacity: 0, x: -4, scale: 0.98 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: -4, scale: 0.98 }}
+            transition={{ duration: 0.13 }}
+            className="absolute left-full top-0 z-50 ml-1 w-64 rounded-2xl border border-border bg-surface p-3 shadow-2xl"
+          >
+            <div className="mb-2 px-1 text-[10px] font-bold uppercase tracking-wider text-text-secondary border-b border-border/60 pb-1.5">
+              {item.label}
+            </div>
+            <div className="space-y-1">
+              {item.dropdown.map((sub) => {
+                const SubIcon = ITEM_ICONS[sub.label] || Sparkles
+                return (
+                  <Link
+                    key={sub.label}
+                    to={sub.to}
+                    onClick={() => {
+                      setSubOpen(false)
+                      setParentOpen(false)
+                    }}
+                    className="flex items-start gap-3 rounded-xl p-2.5 transition-colors hover:bg-surface-alt group"
+                  >
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors mt-0.5">
+                      <SubIcon size={14} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-text group-hover:text-primary transition-colors">
+                        {sub.label}
+                      </p>
+                      {sub.description && (
+                        <p className="mt-0.5 text-[11px] leading-tight text-text-secondary line-clamp-2">
+                          {sub.description}
+                        </p>
+                      )}
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 function UserMenu({ user, onLogout }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
@@ -742,72 +847,6 @@ function MobileMenu({ open, onClose, selectedCity, setSelectedCity }) {
   )
 }
 
-function NavSubDropdown({ item, setOpen }) {
-  const [subOpen, setSubOpen] = useState(false)
-  const IconComponent = ITEM_ICONS[item.label] || Sparkles
-
-  return (
-    <div
-      className="relative"
-      onMouseEnter={() => setSubOpen(true)}
-      onMouseLeave={() => setSubOpen(false)}
-    >
-      <Link
-        to={item.to}
-        onClick={() => setOpen(false)}
-        className="flex items-center justify-between rounded-xl p-2.5 transition-colors hover:bg-surface-alt group"
-      >
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors mt-0.5">
-            <IconComponent size={16} />
-          </div>
-          <p className="text-xs font-bold text-text group-hover:text-primary transition-colors">
-            {item.label}
-          </p>
-        </div>
-        <ChevronDown size={14} className={cn("-rotate-90 text-text-secondary transition-transform", subOpen && "text-primary")} />
-      </Link>
-
-      <AnimatePresence>
-        {subOpen && (
-          <motion.div
-            initial={{ opacity: 0, x: -6, scale: 0.98 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            exit={{ opacity: 0, x: -6, scale: 0.98 }}
-            transition={{ duration: 0.15 }}
-            className="absolute left-full top-0 z-50 ml-2 w-64 overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl p-2"
-          >
-            {item.dropdown.map((subItem) => {
-              const SubIcon = ITEM_ICONS[subItem.label] || Sparkles
-              return (
-                <Link
-                  key={subItem.label}
-                  to={subItem.to}
-                  onClick={() => setOpen(false)}
-                  className="flex items-start gap-3 rounded-xl p-2.5 transition-colors hover:bg-surface-alt group"
-                >
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors mt-0.5">
-                    <SubIcon size={16} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-text group-hover:text-primary transition-colors">
-                      {subItem.label}
-                    </p>
-                    {subItem.description && (
-                      <p className="mt-0.5 text-[11px] leading-tight text-text-secondary line-clamp-1">
-                        {subItem.description}
-                      </p>
-                    )}
-                  </div>
-                </Link>
-              )
-            })}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  )
-}
 
 function MobileNestedDropdown({ item, onClose }) {
   const [open, setOpen] = useState(false)

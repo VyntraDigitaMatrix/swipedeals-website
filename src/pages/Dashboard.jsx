@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
-  Building2, Clock, Eye, Heart, ImagePlus, LayoutDashboard, MessageCircle, PackageSearch,
-  Pencil, RefreshCw, Rocket, ShoppingBag, Sparkles, Star, Tags, Trash2, User as UserIcon, X, XCircle,
+  Archive, Building2, Clock, Eye, FileCheck, Heart, ImagePlus, LayoutDashboard, MessageCircle, PackageSearch,
+  Pencil, RefreshCw, Rocket, ShieldCheck, ShoppingBag, Sliders, Sparkles, Star, Tags, Trash2, User as UserIcon, X, XCircle,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Breadcrumb from '../components/common/Breadcrumb'
@@ -14,6 +14,10 @@ import SimpleLineChart from '../components/dashboard/SimpleLineChart'
 import SavedListingsTable from '../components/dashboard/SavedListingsTable'
 import SellerReviewSection from '../components/seller/SellerReviewSection'
 import PropertyImagesManager from '../components/dashboard/PropertyImagesManager'
+import VehicleImagesManager from '../components/dashboard/VehicleImagesManager'
+import VehicleDocumentsManager from '../components/dashboard/VehicleDocumentsManager'
+import VehicleFeaturesManager from '../components/dashboard/VehicleFeaturesManager'
+import VehicleSpecsManager from '../components/dashboard/VehicleSpecsManager'
 import ChatDrawer from '../components/chat/ChatDrawer'
 import Input from '../components/forms/Input'
 import Dropdown from '../components/forms/Dropdown'
@@ -113,10 +117,15 @@ export default function Dashboard() {
   const { getByPhone } = useListingsStore()
   const {
     listings: apiListings,
+    archivedListings: archivedVehicleListings,
     loading: apiLoading,
     fetchListings,
+    fetchArchivedListings,
     updateListing,
     deleteListing,
+    submitListing: submitVehicleListing,
+    archiveListing: archiveVehicleListing,
+    restoreListing: restoreVehicleListing,
   } = useVehicleListings()
 
   const {
@@ -145,16 +154,37 @@ export default function Dashboard() {
   const [savingPropEdit, setSavingPropEdit] = useState(false)
   const [deletingPropSlug, setDeletingPropSlug] = useState(null)
   const [managingImagesForSlug, setManagingImagesForSlug] = useState(null)
+  const [managingVehicleImagesSlug, setManagingVehicleImagesSlug] = useState(null)
+  const [managingVehicleDocsSlug, setManagingVehicleDocsSlug] = useState(null)
+  const [managingVehicleFeaturesSlug, setManagingVehicleFeaturesSlug] = useState(null)
+  const [managingVehicleSpecsSlug, setManagingVehicleSpecsSlug] = useState(null)
   const [dashboardChatOpen, setDashboardChatOpen] = useState(false)
   const [chatRecipient, setChatRecipient] = useState(null)
+
+  const handleSubmitVehicle = async (slug) => {
+    if (!window.confirm('Submit this vehicle listing for approval?')) return
+    try {
+      await submitVehicleListing(slug)
+    } catch (err) {
+      const errMsg = err?.response?.data?.message || err?.message || 'Failed to submit vehicle listing.'
+      if (errMsg.toLowerCase().includes('image') || errMsg.toLowerCase().includes('photo')) {
+        if (window.confirm(`${errMsg}\n\nWould you like to upload images now?`)) {
+          setManagingVehicleImagesSlug(slug)
+        }
+      } else {
+        alert(errMsg)
+      }
+    }
+  }
 
   const { conversations: apiConversations, loading: chatLoading, selectConversation } = useChat(true)
 
   useEffect(() => {
     fetchListings().catch(() => {})
+    fetchArchivedListings().catch(() => {})
     fetchPropertyListings().catch(() => {})
     fetchSparePartsListings().catch(() => {})
-  }, [fetchListings, fetchPropertyListings, fetchSparePartsListings])
+  }, [fetchListings, fetchArchivedListings, fetchPropertyListings, fetchSparePartsListings])
 
   const savedItems = findItemsByIds(wishlist).map((item) => ({ ...item, categoryLabel: CATEGORY_LABELS[item.category] }))
   const localListings = user?.phone ? getByPhone(user.phone) : []
@@ -165,6 +195,7 @@ export default function Dashboard() {
   const TABS = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, count: null },
     { id: 'listings', label: 'My Listings', icon: Tags, count: combinedListingsCount },
+    { id: 'archived', label: 'Archived Listings', icon: Archive, count: archivedVehicleListings.length },
     { id: 'properties', label: 'My Properties', icon: Building2, count: propertyListings.length },
     { id: 'saved', label: 'Saved', icon: Heart, count: savedItems.length },
     { id: 'orders', label: 'Orders', icon: ShoppingBag, count: userOrders.length },
@@ -493,7 +524,76 @@ export default function Dashboard() {
                     <Link to={`/cars/${v.slug}`} className="text-xs font-semibold text-primary hover:underline">
                       View details &rarr;
                     </Link>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-1.5">
+                      {v.status === 'DRAFT' && (
+                        <Button
+                          size="xs"
+                          variant="primary"
+                          icon={Rocket}
+                          onClick={() => handleSubmitVehicle(v.slug)}
+                        >
+                          Submit
+                        </Button>
+                      )}
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        icon={ImagePlus}
+                        onClick={() => setManagingVehicleImagesSlug(v.slug)}
+                      >
+                        Photos
+                      </Button>
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        icon={FileCheck}
+                        onClick={() => setManagingVehicleDocsSlug(v.slug)}
+                      >
+                        Docs
+                      </Button>
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        icon={Sparkles}
+                        onClick={() => setManagingVehicleFeaturesSlug(v.slug)}
+                      >
+                        Features
+                      </Button>
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        icon={Sliders}
+                        onClick={() => setManagingVehicleSpecsSlug(v.slug)}
+                      >
+                        Specs
+                      </Button>
+                      {v.status === 'ARCHIVED' ? (
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          icon={RefreshCw}
+                          onClick={() => {
+                            if (window.confirm('Restore this archived vehicle listing?')) {
+                              restoreVehicleListing(v.slug)
+                            }
+                          }}
+                        >
+                          Restore
+                        </Button>
+                      ) : (
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          className="text-text-secondary"
+                          onClick={() => {
+                            if (window.confirm('Archive this vehicle listing?')) {
+                              archiveVehicleListing(v.slug)
+                            }
+                          }}
+                        >
+                          Archive
+                        </Button>
+                      )}
                       <Button size="xs" variant="outline" icon={Pencil} onClick={() => handleOpenEdit(v)}>
                         Edit
                       </Button>
@@ -584,6 +684,96 @@ export default function Dashboard() {
                     </div>
                     <p className="mt-1 text-xs text-text-secondary">{CATEGORY_LABELS[listing.category] || listing.category}</p>
                     <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(listing.price)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'archived' && (
+        <div>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-text-secondary">{archivedVehicleListings.length} archived vehicle listing{archivedVehicleListings.length === 1 ? '' : 's'}</p>
+              <button
+                type="button"
+                onClick={() => fetchArchivedListings()}
+                disabled={apiLoading}
+                className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+              >
+                <RefreshCw size={12} className={cn(apiLoading && 'animate-spin')} /> Refresh
+              </button>
+            </div>
+          </div>
+
+          {archivedVehicleListings.length === 0 && !apiLoading ? (
+            <EmptyState
+              icon={Archive}
+              title="No archived listings"
+              description="Vehicle listings you archive will appear here. You can restore them anytime to make them live again."
+            />
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {archivedVehicleListings.map((v) => (
+                <div key={v.slug} className="group relative flex flex-col justify-between rounded-2xl border border-border bg-surface/70 p-5 shadow-soft transition-transform hover:-translate-y-0.5">
+                  <div className="flex gap-4">
+                    <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
+                      <img src={PLACEHOLDER_IMAGE} alt="" className="h-full w-full object-cover grayscale opacity-80" />
+                      <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-text-light" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="line-clamp-1 text-sm font-bold text-text">
+                          {titleCaseEnum(v.brand)} {v.model} {v.variant}
+                        </p>
+                        <Badge variant="neutral">
+                          ARCHIVED
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-xs text-text-secondary">
+                        {v.year} · {titleCaseEnum(v.fuelType)} · {titleCaseEnum(v.transmissionType)}
+                      </p>
+                      <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(v.price)}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-alt/70 p-2.5 font-mono text-[11px] text-text-secondary">
+                    <div><span className="text-text-light">Reg:</span> {v.registrationNumber || 'N/A'}</div>
+                    <div><span className="text-text-light">VIN:</span> {v.vin || 'N/A'}</div>
+                    <div><span className="text-text-light">Chassis:</span> {v.chassisNumber || 'N/A'}</div>
+                  </div>
+
+                  <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                    <span className="text-xs font-medium text-text-secondary">Archived</span>
+                    <div className="flex gap-2">
+                      <Button
+                        size="xs"
+                        variant="primary"
+                        icon={RefreshCw}
+                        onClick={() => {
+                          if (window.confirm('Restore this archived vehicle listing?')) {
+                            restoreVehicleListing(v.slug)
+                          }
+                        }}
+                      >
+                        Restore
+                      </Button>
+                      <Button size="xs" variant="outline" icon={Pencil} onClick={() => handleOpenEdit(v)}>
+                        Edit
+                      </Button>
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        icon={Trash2}
+                        className="text-danger border-danger/20 hover:bg-danger/10"
+                        disabled={deletingSlug === v.slug}
+                        onClick={() => handleDeleteVehicle(v.slug)}
+                      >
+                        {deletingSlug === v.slug ? 'Deleting...' : 'Delete'}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -848,16 +1038,16 @@ export default function Dashboard() {
                 options={VEHICLE_BRANDS}
               />
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Model" value={editForm.model} onChange={(e) => setEditForm((prev) => ({ ...prev, model: e.target.value }))} />
-                <Input label="Variant" value={editForm.variant} onChange={(e) => setEditForm((prev) => ({ ...prev, variant: e.target.value }))} />
+                <Input label="Model (max 100 chars)" maxLength={100} value={editForm.model} onChange={(e) => setEditForm((prev) => ({ ...prev, model: e.target.value }))} />
+                <Input label="Variant (max 100 chars)" maxLength={100} value={editForm.variant} onChange={(e) => setEditForm((prev) => ({ ...prev, variant: e.target.value }))} />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Year" type="number" value={editForm.year} onChange={(e) => setEditForm((prev) => ({ ...prev, year: parseInt(e.target.value, 10) || 0 }))} />
-                <Input label="Price (₹)" type="number" value={editForm.price} onChange={(e) => setEditForm((prev) => ({ ...prev, price: parseFloat(e.target.value) || 0 }))} />
+                <Input label="Manufacturing Year (1950-2100)" type="number" min="1950" max="2100" value={editForm.year} onChange={(e) => setEditForm((prev) => ({ ...prev, year: parseInt(e.target.value, 10) || 0 }))} />
+                <Input label="Price (₹)" type="number" min="0" value={editForm.price} onChange={(e) => setEditForm((prev) => ({ ...prev, price: parseFloat(e.target.value) || 0 }))} />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <Input label="Mileage / Odometer" type="number" value={editForm.mileage} onChange={(e) => setEditForm((prev) => ({ ...prev, mileage: parseInt(e.target.value, 10) || 0 }))} />
-                <Input label="Color" value={editForm.color} onChange={(e) => setEditForm((prev) => ({ ...prev, color: e.target.value }))} />
+                <Input label="Mileage / Odometer (km)" type="number" min="0" value={editForm.mileage} onChange={(e) => setEditForm((prev) => ({ ...prev, mileage: parseInt(e.target.value, 10) || 0 }))} />
+                <Input label="Color (max 50 chars)" maxLength={50} value={editForm.color} onChange={(e) => setEditForm((prev) => ({ ...prev, color: e.target.value }))} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Dropdown label="Condition" value={editForm.condition} onChange={(v) => setEditForm((prev) => ({ ...prev, condition: v }))} options={VEHICLE_CONDITIONS} />
@@ -865,14 +1055,14 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Dropdown label="Transmission" value={editForm.transmissionType} onChange={(v) => setEditForm((prev) => ({ ...prev, transmissionType: v }))} options={TRANSMISSION_TYPES} />
-                <Input label="Owners Count" type="number" value={editForm.ownersCount} onChange={(e) => setEditForm((prev) => ({ ...prev, ownersCount: parseInt(e.target.value, 10) || 1 }))} />
+                <Input label="Owners Count (1-10)" type="number" min="1" max="10" value={editForm.ownersCount} onChange={(e) => setEditForm((prev) => ({ ...prev, ownersCount: Math.min(10, Math.max(1, parseInt(e.target.value, 10) || 1)) }))} />
               </div>
               <div className="grid grid-cols-3 gap-3">
-                <Input label="Reg Number" value={editForm.registrationNumber} onChange={(e) => setEditForm((prev) => ({ ...prev, registrationNumber: e.target.value }))} />
-                <Input label="Chassis Number" value={editForm.chassisNumber} onChange={(e) => setEditForm((prev) => ({ ...prev, chassisNumber: e.target.value }))} />
-                <Input label="VIN" value={editForm.vin} onChange={(e) => setEditForm((prev) => ({ ...prev, vin: e.target.value }))} />
+                <Input label="Reg Number (5-20 chars)" maxLength={20} value={editForm.registrationNumber} onChange={(e) => setEditForm((prev) => ({ ...prev, registrationNumber: e.target.value }))} />
+                <Input label="Chassis Number (10-50 chars)" maxLength={50} value={editForm.chassisNumber} onChange={(e) => setEditForm((prev) => ({ ...prev, chassisNumber: e.target.value }))} />
+                <Input label="VIN (max 100 chars)" maxLength={100} value={editForm.vin} onChange={(e) => setEditForm((prev) => ({ ...prev, vin: e.target.value }))} />
               </div>
-              <TextArea label="Description" value={editForm.description} onChange={(e) => setEditForm((prev) => ({ ...prev, description: e.target.value }))} />
+              <TextArea label="Description (max 3000 chars)" maxLength={3000} value={editForm.description} onChange={(e) => setEditForm((prev) => ({ ...prev, description: e.target.value }))} />
             </div>
 
             <div className="mt-6 flex justify-end gap-3 border-t border-border pt-4">
@@ -969,6 +1159,50 @@ export default function Dashboard() {
           onClose={() => {
             setManagingImagesForSlug(null)
             fetchPropertyListings() // refresh listings to pick up new primary images
+          }}
+        />
+      )}
+
+      {/* Vehicle Images Manager Modal */}
+      {managingVehicleImagesSlug && (
+        <VehicleImagesManager
+          slug={managingVehicleImagesSlug}
+          onClose={() => {
+            setManagingVehicleImagesSlug(null)
+            fetchListings() // refresh listings to pick up new vehicle images
+          }}
+        />
+      )}
+
+      {/* Vehicle Documents Manager Modal */}
+      {managingVehicleDocsSlug && (
+        <VehicleDocumentsManager
+          slug={managingVehicleDocsSlug}
+          onClose={() => {
+            setManagingVehicleDocsSlug(null)
+            fetchListings()
+          }}
+        />
+      )}
+
+      {/* Vehicle Features Manager Modal */}
+      {managingVehicleFeaturesSlug && (
+        <VehicleFeaturesManager
+          slug={managingVehicleFeaturesSlug}
+          onClose={() => {
+            setManagingVehicleFeaturesSlug(null)
+            fetchListings()
+          }}
+        />
+      )}
+
+      {/* Vehicle Specs Manager Modal */}
+      {managingVehicleSpecsSlug && (
+        <VehicleSpecsManager
+          slug={managingVehicleSpecsSlug}
+          onClose={() => {
+            setManagingVehicleSpecsSlug(null)
+            fetchListings()
           }}
         />
       )}
