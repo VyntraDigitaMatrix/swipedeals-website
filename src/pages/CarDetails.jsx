@@ -7,6 +7,7 @@ import VehicleCard from '../components/vehicle/VehicleCard'
 import LoanCalculator from '../components/vehicle/LoanCalculator'
 import EmptyState from '../components/common/EmptyState'
 import { vehicleService, mapVehicleToCarCard, extractImages } from '../services/publicListingService'
+import { vehicleListingService } from '../services/vehicleListingService'
 import { usePublicImages } from '../hooks/usePublicImages'
 import { PLACEHOLDER_IMAGE } from '../utils/enumFormat'
 import { formatCurrencyFull, formatDate } from '../utils/format'
@@ -23,17 +24,46 @@ export default function CarDetails() {
     let cancelled = false
     setLoading(true)
     setNotFound(false)
-    vehicleService
-      .getBySlug(slug)
-      .then((res) => {
-        if (!cancelled) setRaw(res?.data ?? null)
-      })
-      .catch(() => {
-        if (!cancelled) setNotFound(true)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+
+    const fetchVehicle = async () => {
+      let data = null
+      // 1. Try public endpoint first
+      try {
+        const res = await vehicleService.getBySlug(slug)
+        const candidate = (res?.data && typeof res.data === 'object' && (res.data.slug || res.data.id || res.data.brand)) ? res.data : res
+        if (candidate && (candidate.slug || candidate.id || candidate.brand)) {
+          data = candidate
+        }
+      } catch (e) {
+        // Public API failed (e.g. listing is UNDER_REVIEW, DRAFT, etc.)
+      }
+
+      // 2. If public fetch failed, try authenticated seller listing endpoint
+      if (!data) {
+        try {
+          const sellerRes = await vehicleListingService.getBySlug(slug)
+          const candidate = (sellerRes?.data && typeof sellerRes.data === 'object' && (sellerRes.data.slug || sellerRes.data.id || sellerRes.data.brand)) ? sellerRes.data : sellerRes
+          if (candidate && (candidate.slug || candidate.id || candidate.brand)) {
+            data = candidate
+          }
+        } catch (e) {
+          // Seller service failed as well
+        }
+      }
+
+      if (!cancelled) {
+        if (data) {
+          setRaw(data)
+        } else {
+          setNotFound(true)
+        }
+      }
+    }
+
+    fetchVehicle().finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+
     return () => { cancelled = true }
   }, [slug])
 

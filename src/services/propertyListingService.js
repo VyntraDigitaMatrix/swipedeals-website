@@ -122,6 +122,24 @@ export const propertyListingService = {
   },
 
   /**
+   * PATCH /api/user/products/properties/{slug}/make-available
+   * Make a property listing available.
+   */
+  makeAvailable: async (slug) => {
+    const res = await api.patch(`/api/user/products/properties/${encodeURIComponent(slug)}/make-available`)
+    return res.data
+  },
+
+  /**
+   * PATCH /api/user/products/properties/{slug}/archive
+   * Archive a property listing.
+   */
+  archive: async (slug) => {
+    const res = await api.patch(`/api/user/products/properties/${encodeURIComponent(slug)}/archive`)
+    return res.data
+  },
+
+  /**
    * POST /api/user/products/properties/{slug}
    * Upload multiple images for a property listing.
    */

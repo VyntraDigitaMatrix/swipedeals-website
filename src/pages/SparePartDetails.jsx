@@ -5,6 +5,7 @@ import DetailLayout from '../components/listing/DetailLayout'
 import SparePartCard from '../components/cards/SparePartCard'
 import EmptyState from '../components/common/EmptyState'
 import { sparePartsService, mapSparePartToCard, extractImages } from '../services/publicListingService'
+import { sparePartsListingService } from '../services/sparePartsListingService'
 import { usePublicImages } from '../hooks/usePublicImages'
 import { PLACEHOLDER_IMAGE, titleCaseEnum } from '../utils/enumFormat'
 import { formatCurrencyFull, formatDate } from '../utils/format'
@@ -21,17 +22,44 @@ export default function SparePartDetails() {
     let cancelled = false
     setLoading(true)
     setNotFound(false)
-    sparePartsService
-      .getBySlug(slug)
-      .then((res) => {
-        if (!cancelled) setRaw(res?.data ?? null)
-      })
-      .catch(() => {
-        if (!cancelled) setNotFound(true)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+
+    const fetchSparePart = async () => {
+      let data = null
+      try {
+        const res = await sparePartsService.getBySlug(slug)
+        const candidate = (res?.data && typeof res.data === 'object' && (res.data.slug || res.data.id || res.data.partName || res.data.title)) ? res.data : res
+        if (candidate && (candidate.slug || candidate.id || candidate.partName || candidate.title)) {
+          data = candidate
+        }
+      } catch (e) {
+        // Public endpoint failed
+      }
+
+      if (!data) {
+        try {
+          const sellerRes = await sparePartsListingService.getBySlug(slug)
+          const candidate = (sellerRes?.data && typeof sellerRes.data === 'object' && (sellerRes.data.slug || sellerRes.data.id || sellerRes.data.partName || sellerRes.data.title)) ? sellerRes.data : sellerRes
+          if (candidate && (candidate.slug || candidate.id || candidate.partName || candidate.title)) {
+            data = candidate
+          }
+        } catch (e) {
+          // Seller service failed
+        }
+      }
+
+      if (!cancelled) {
+        if (data) {
+          setRaw(data)
+        } else {
+          setNotFound(true)
+        }
+      }
+    }
+
+    fetchSparePart().finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+
     return () => { cancelled = true }
   }, [slug])
 

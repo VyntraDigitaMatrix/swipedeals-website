@@ -65,6 +65,24 @@ export const sparePartsListingService = {
   },
 
   /**
+   * PATCH /api/user/products/spare-parts/{slug}/make-available
+   * Make a spare part listing available.
+   */
+  makeAvailable: async (slug) => {
+    const res = await api.patch(`/api/user/products/spare-parts/${encodeURIComponent(slug)}/make-available`)
+    return res.data
+  },
+
+  /**
+   * PATCH /api/user/products/spare-parts/{slug}/archive
+   * Archive a spare part listing.
+   */
+  archive: async (slug) => {
+    const res = await api.patch(`/api/user/products/spare-parts/${encodeURIComponent(slug)}/archive`)
+    return res.data
+  },
+
+  /**
    * POST /api/user/products/spare-parts/{slug}/images
    * Upload multiple images for a spare part listing.
    */

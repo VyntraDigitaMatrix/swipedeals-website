@@ -274,6 +274,18 @@ export function useVehicleListings() {
     }
   }, [])
 
+function getValidListingItem(res, fallbackStatus, currentItem) {
+  const candidate = res?.data ?? res
+  if (candidate && typeof candidate === 'object' && (candidate.title || candidate.slug || candidate.id || candidate.brand)) {
+    const statusVal = typeof candidate.status === 'string' && candidate.status !== '200' ? candidate.status : fallbackStatus
+    return { ...currentItem, ...candidate, status: statusVal }
+  }
+  return {
+    ...currentItem,
+    status: fallbackStatus || currentItem?.status || 'APPROVED',
+  }
+}
+
   /**
    * PATCH /api/vehicle-listings/{slug}/submit (submitListing_1)
    */
@@ -282,9 +294,9 @@ export function useVehicleListings() {
     setError(null)
     try {
       const res = await vehicleListingService.submitListing_1(slug)
-      const updated = res?.data ?? res
-      setListings((prev) => prev.map((item) => (item.slug === slug ? updated : item)))
-      return updated
+      setListings((prev) => prev.map((item) => (item.slug === slug ? getValidListingItem(res, 'PENDING_APPROVAL', item) : item)))
+      fetchListings().catch(() => {})
+      return res
     } catch (err) {
       const errMsg = err?.response?.data?.message || err?.message || 'Failed to submit vehicle listing for approval.'
       setError(errMsg)
@@ -292,7 +304,7 @@ export function useVehicleListings() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [fetchListings])
 
   /**
    * PATCH /api/vehicle-listings/{slug}/archive (archiveMyListing)
@@ -302,10 +314,13 @@ export function useVehicleListings() {
     setError(null)
     try {
       const res = await vehicleListingService.archiveMyListing(slug)
-      const archivedItem = res?.data ?? res
+      let targetItem = listings.find((item) => item.slug === slug)
+      const validItem = getValidListingItem(res, 'ARCHIVED', targetItem)
       setListings((prev) => prev.filter((item) => item.slug !== slug))
-      setArchivedListings((prev) => [archivedItem, ...prev])
-      return archivedItem
+      setArchivedListings((prev) => [validItem, ...prev.filter((i) => i.slug !== slug)])
+      fetchListings().catch(() => {})
+      fetchArchivedListings().catch(() => {})
+      return validItem
     } catch (err) {
       const errMsg = err?.response?.data?.message || err?.message || 'Failed to archive vehicle listing.'
       setError(errMsg)
@@ -313,7 +328,7 @@ export function useVehicleListings() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [listings, fetchListings, fetchArchivedListings])
 
   /**
    * PATCH /api/vehicle-listings/{slug}/restore (restoreMyArchivedListing)
@@ -323,10 +338,13 @@ export function useVehicleListings() {
     setError(null)
     try {
       const res = await vehicleListingService.restoreMyArchivedListing(slug)
-      const restoredItem = res?.data ?? res
+      let targetItem = archivedListings.find((item) => item.slug === slug)
+      const validItem = getValidListingItem(res, 'APPROVED', targetItem)
       setArchivedListings((prev) => prev.filter((item) => item.slug !== slug))
-      setListings((prev) => [restoredItem, ...prev])
-      return restoredItem
+      setListings((prev) => [validItem, ...prev.filter((i) => i.slug !== slug)])
+      fetchListings().catch(() => {})
+      fetchArchivedListings().catch(() => {})
+      return validItem
     } catch (err) {
       const errMsg = err?.response?.data?.message || err?.message || 'Failed to restore archived vehicle listing.'
       setError(errMsg)
@@ -334,7 +352,7 @@ export function useVehicleListings() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [archivedListings, fetchListings, fetchArchivedListings])
 
   return {
     listings,

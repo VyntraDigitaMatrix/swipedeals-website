@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
-  Archive, Building2, Clock, Eye, FileCheck, Heart, ImagePlus, LayoutDashboard, MessageCircle, PackageSearch,
-  Pencil, RefreshCw, Rocket, ShieldCheck, ShoppingBag, Sliders, Sparkles, Star, Tags, Trash2, User as UserIcon, X, XCircle,
+  Archive, Building2, Clock, Eye, FileCheck, Heart, ImagePlus, Laptop, LayoutDashboard, MessageCircle, PackageSearch,
+  Pencil, RefreshCw, Rocket, ShieldCheck, ShoppingBag, Sliders, Sparkles, Star, Tags, Trash2, User as UserIcon, Wrench, X, XCircle,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Breadcrumb from '../components/common/Breadcrumb'
@@ -12,7 +12,7 @@ import StatCard from '../components/dashboard/StatCard'
 import SimpleBarChart from '../components/dashboard/SimpleBarChart'
 import SimpleLineChart from '../components/dashboard/SimpleLineChart'
 import SavedListingsTable from '../components/dashboard/SavedListingsTable'
-import SellerReviewSection from '../components/seller/SellerReviewSection'
+// import SellerReviewSection from '../components/seller/SellerReviewSection'
 import PropertyImagesManager from '../components/dashboard/PropertyImagesManager'
 import VehicleImagesManager from '../components/dashboard/VehicleImagesManager'
 import VehicleDocumentsManager from '../components/dashboard/VehicleDocumentsManager'
@@ -28,6 +28,7 @@ import { useListingsStore } from '../hooks/useListingsStore'
 import { useVehicleListings } from '../hooks/useVehicleListings'
 import { usePropertyListings } from '../hooks/usePropertyListings'
 import { useSparePartsListings } from '../hooks/useSparePartsListings'
+import { useElectronicsListings } from '../hooks/useElectronicsListings'
 import { useChat } from '../hooks/useChat'
 import {
   VEHICLE_BRANDS,
@@ -135,7 +136,19 @@ export default function Dashboard() {
     patchListing: patchPropertyListing,
     deleteListing: deletePropertyListing,
     submitListing: submitPropertyListing,
+    makeAvailableListing: makeAvailablePropertyListing,
+    archiveListing: archivePropertyListing,
   } = usePropertyListings()
+
+  const {
+    listings: electronicsListings,
+    loading: electronicsLoading,
+    fetchListings: fetchElectronicsListings,
+    deleteListing: deleteElectronicsListing,
+    submitListing: submitElectronicsListing,
+    makeAvailableListing: makeAvailableElectronicsListing,
+    archiveListing: archiveElectronicsListing,
+  } = useElectronicsListings()
 
   const {
     listings: sparePartsListings,
@@ -143,6 +156,8 @@ export default function Dashboard() {
     fetchListings: fetchSparePartsListings,
     deleteListing: deleteSparePartListing,
     submitListing: submitSparePartListing,
+    makeAvailableListing: makeAvailableSparePartListing,
+    archiveListing: archiveSparePartListing,
   } = useSparePartsListings()
 
   const [editingVehicle, setEditingVehicle] = useState(null)
@@ -180,28 +195,35 @@ export default function Dashboard() {
   const { conversations: apiConversations, loading: chatLoading, selectConversation } = useChat(true)
 
   useEffect(() => {
-    fetchListings().catch(() => {})
-    fetchArchivedListings().catch(() => {})
-    fetchPropertyListings().catch(() => {})
-    fetchSparePartsListings().catch(() => {})
-  }, [fetchListings, fetchArchivedListings, fetchPropertyListings, fetchSparePartsListings])
+    fetchListings().catch(() => { })
+    fetchArchivedListings().catch(() => { })
+    fetchPropertyListings().catch(() => { })
+    fetchElectronicsListings().catch(() => { })
+    fetchSparePartsListings().catch(() => { })
+  }, [fetchListings, fetchArchivedListings, fetchPropertyListings, fetchElectronicsListings, fetchSparePartsListings])
 
   const savedItems = findItemsByIds(wishlist).map((item) => ({ ...item, categoryLabel: CATEGORY_LABELS[item.category] }))
   const localListings = user?.phone ? getByPhone(user.phone) : []
-  const combinedListingsCount = apiListings.length + propertyListings.length + sparePartsListings.length + localListings.length
+  const combinedListingsCount = apiListings.length + propertyListings.length + electronicsListings.length + sparePartsListings.length + localListings.length
   const unreadCount = userMessages.filter((m) => m.unread).length
   const initials = (user?.name || 'U').trim().split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase()).join('')
+
+  const archivedProperties = propertyListings.filter((p) => p.status === 'ARCHIVED')
+  const archivedElectronics = electronicsListings.filter((e) => e.status === 'ARCHIVED')
+  const archivedSpareParts = sparePartsListings.filter((s) => s.status === 'ARCHIVED')
+  const totalArchivedCount = archivedVehicleListings.length + archivedProperties.length + archivedElectronics.length + archivedSpareParts.length
 
   const TABS = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, count: null },
     { id: 'listings', label: 'My Listings', icon: Tags, count: combinedListingsCount },
-    { id: 'archived', label: 'Archived Listings', icon: Archive, count: archivedVehicleListings.length },
+    { id: 'archived', label: 'Archived Listings', icon: Archive, count: totalArchivedCount },
     { id: 'properties', label: 'My Properties', icon: Building2, count: propertyListings.length },
+    { id: 'electronics', label: 'My Electronics', icon: Laptop, count: electronicsListings.length },
+    { id: 'spare-parts', label: 'My Spare Parts', icon: Wrench, count: sparePartsListings.length },
     { id: 'saved', label: 'Saved', icon: Heart, count: savedItems.length },
-    { id: 'orders', label: 'Orders', icon: ShoppingBag, count: userOrders.length },
     { id: 'inquiries', label: 'Inquiries', icon: PackageSearch, count: userInquiries.length },
     { id: 'messages', label: 'Messages', icon: MessageCircle, count: unreadCount },
-    { id: 'reviews', label: 'Reviews', icon: Star, count: null },
+    // { id: 'reviews', label: 'Reviews', icon: Star, count: null },
   ]
 
   const handleOpenEdit = (v) => {
@@ -399,12 +421,14 @@ export default function Dashboard() {
               <SectionHeading eyebrow="Inventory" title="Active Listings" count={Math.min(combinedListingsCount, 3)} />
               {combinedListingsCount > 0 ? (
                 <div className="space-y-4">
-                  {apiListings.slice(0, 3).map((v) => (
-                    <div key={v.slug} className="group flex gap-4 rounded-2xl border border-border bg-surface p-4 shadow-soft">
-                      <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
-                        <img src={PLACEHOLDER_IMAGE} alt="" className="h-full w-full object-cover" />
-                        <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
-                      </div>
+                  {apiListings.slice(0, 3).map((v) => {
+                    const vehicleImage = (typeof v.images?.[0] === 'string' ? v.images[0] : v.images?.[0]?.imageUrl) || v.primaryImage || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=800&q=60'
+                    return (
+                      <div key={v.slug} className="group flex gap-4 rounded-2xl border border-border bg-surface p-4 shadow-soft">
+                        <div className="relative h-16 w-20 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
+                          <img src={vehicleImage} alt="" className="h-full w-full object-cover" />
+                          <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
+                        </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
                           <p className="line-clamp-1 text-sm font-bold text-text">{titleCaseEnum(v.brand)} {v.model} {v.variant}</p>
@@ -418,7 +442,7 @@ export default function Dashboard() {
                         <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(v.price)}</p>
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
               ) : (
                 <div className="rounded-2xl border border-border bg-surface p-6 text-center shadow-soft">
@@ -490,185 +514,388 @@ export default function Dashboard() {
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {/* API Vehicle Listings */}
-              {apiListings.map((v) => (
-                <div key={v.slug} className="group relative flex flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-soft transition-transform hover:-translate-y-0.5">
-                  <div className="flex gap-4">
-                    <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
-                      <img src={PLACEHOLDER_IMAGE} alt="" className="h-full w-full object-cover" />
-                      <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="line-clamp-1 text-sm font-bold text-text">
-                          {titleCaseEnum(v.brand)} {v.model} {v.variant}
-                        </p>
-                        <Badge variant={LISTING_STATUS_VARIANT[v.status] || 'neutral'}>
-                          {LISTING_STATUS_LABEL[v.status] || v.status}
-                        </Badge>
+              {apiListings.map((v) => {
+                const vehicleImage = v.images?.[0]?.imageUrl || v.primaryImage || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=800&q=60'
+                const vehicleTitle = v.title || `${titleCaseEnum(v.brand)} ${v.model} ${v.variant}`.trim()
+                return (
+                  <div key={v.slug} className="group relative flex flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-soft transition-transform hover:-translate-y-0.5">
+                    <div className="flex gap-4">
+                      <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
+                        <img src={vehicleImage} alt={vehicleTitle} className="h-full w-full object-cover" />
+                        <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
                       </div>
-                      <p className="mt-1 text-xs text-text-secondary">
-                        {v.year} · {titleCaseEnum(v.fuelType)} · {titleCaseEnum(v.transmissionType)}
-                      </p>
-                      <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(v.price)}</p>
-                    </div>
-                  </div>
-
-                  {/* Schema fields display */}
-                  <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-alt/70 p-2.5 font-mono text-[11px] text-text-secondary">
-                    <div><span className="text-text-light">Reg:</span> {v.registrationNumber || 'N/A'}</div>
-                    <div><span className="text-text-light">VIN:</span> {v.vin || 'N/A'}</div>
-                    <div><span className="text-text-light">Chassis:</span> {v.chassisNumber || 'N/A'}</div>
-                  </div>
-
-                  <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-                    <Link to={`/cars/${v.slug}`} className="text-xs font-semibold text-primary hover:underline">
-                      View details &rarr;
-                    </Link>
-                    <div className="flex flex-wrap gap-1.5">
-                      {v.status === 'DRAFT' && (
-                        <Button
-                          size="xs"
-                          variant="primary"
-                          icon={Rocket}
-                          onClick={() => handleSubmitVehicle(v.slug)}
-                        >
-                          Submit
-                        </Button>
-                      )}
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        icon={ImagePlus}
-                        onClick={() => setManagingVehicleImagesSlug(v.slug)}
-                      >
-                        Photos
-                      </Button>
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        icon={FileCheck}
-                        onClick={() => setManagingVehicleDocsSlug(v.slug)}
-                      >
-                        Docs
-                      </Button>
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        icon={Sparkles}
-                        onClick={() => setManagingVehicleFeaturesSlug(v.slug)}
-                      >
-                        Features
-                      </Button>
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        icon={Sliders}
-                        onClick={() => setManagingVehicleSpecsSlug(v.slug)}
-                      >
-                        Specs
-                      </Button>
-                      {v.status === 'ARCHIVED' ? (
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          icon={RefreshCw}
-                          onClick={() => {
-                            if (window.confirm('Restore this archived vehicle listing?')) {
-                              restoreVehicleListing(v.slug)
-                            }
-                          }}
-                        >
-                          Restore
-                        </Button>
-                      ) : (
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          className="text-text-secondary"
-                          onClick={() => {
-                            if (window.confirm('Archive this vehicle listing?')) {
-                              archiveVehicleListing(v.slug)
-                            }
-                          }}
-                        >
-                          Archive
-                        </Button>
-                      )}
-                      <Button size="xs" variant="outline" icon={Pencil} onClick={() => handleOpenEdit(v)}>
-                        Edit
-                      </Button>
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        icon={Trash2}
-                        className="text-danger border-danger/20 hover:bg-danger/10"
-                        disabled={deletingSlug === v.slug}
-                        onClick={() => handleDeleteVehicle(v.slug)}
-                      >
-                        {deletingSlug === v.slug ? 'Deleting...' : 'Delete'}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {/* API Spare Parts Listings */}
-              {sparePartsListings.map((s) => (
-                <div key={s.slug || s.id} className="group relative flex flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-soft transition-transform hover:-translate-y-0.5">
-                  <div className="flex gap-4">
-                    <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
-                      <img src={s.images?.[0]?.imageUrl || PLACEHOLDER_IMAGE} alt="" className="h-full w-full object-cover" />
-                      <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-danger" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="line-clamp-1 text-sm font-bold text-text">
-                          {s.title}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="line-clamp-1 text-sm font-bold text-text">
+                            {vehicleTitle}
+                          </p>
+                          <Badge variant={LISTING_STATUS_VARIANT[v.status] || 'neutral'}>
+                            {LISTING_STATUS_LABEL[v.status] || v.status}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-text-secondary">
+                          {v.year} · {titleCaseEnum(v.fuelType)} · {titleCaseEnum(v.transmissionType)}
                         </p>
-                        <Badge variant={LISTING_STATUS_VARIANT[s.status] || 'neutral'}>
-                          {LISTING_STATUS_LABEL[s.status] || s.status}
-                        </Badge>
+                        <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(v.price)}</p>
                       </div>
-                      <p className="mt-1 text-xs text-text-secondary">
-                        {s.category} · {s.brand}
-                      </p>
-                      <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(s.price)}</p>
                     </div>
-                  </div>
 
-                  <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-                    {s.slug && (
-                      <Link to={`/spare-parts/${s.slug}`} className="text-xs font-semibold text-primary hover:underline">
+                    {/* Schema fields display */}
+                    <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-alt/70 p-2.5 font-mono text-[11px] text-text-secondary">
+                      <div><span className="text-text-light">Reg:</span> {v.registrationNumber || 'N/A'}</div>
+                      <div><span className="text-text-light">VIN:</span> {v.vin || 'N/A'}</div>
+                      <div><span className="text-text-light">Chassis:</span> {v.chassisNumber || 'N/A'}</div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                      <Link to={`/cars/${v.slug}`} className="text-xs font-semibold text-primary hover:underline">
                         View details &rarr;
                       </Link>
-                    )}
-                    <div className="flex gap-2">
-                      {s.status === 'DRAFT' && (
-                        <Button size="xs" variant="primary" icon={Rocket} onClick={() => {
-                          if (window.confirm('Submit this spare part for approval?')) {
-                            submitSparePartListing(s.slug)
-                          }
-                        }}>
-                          Submit
+                      <div className="flex flex-wrap gap-1.5">
+                        {v.status === 'DRAFT' && (
+                          <Button
+                            size="xs"
+                            variant="primary"
+                            icon={Rocket}
+                            onClick={() => handleSubmitVehicle(v.slug)}
+                          >
+                            Submit
+                          </Button>
+                        )}
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          icon={ImagePlus}
+                          onClick={() => setManagingVehicleImagesSlug(v.slug)}
+                        >
+                          Photos
                         </Button>
-                      )}
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        icon={Trash2}
-                        className="text-danger border-danger/20 hover:bg-danger/10"
-                        onClick={() => {
-                          if (window.confirm('Are you sure you want to delete this spare part listing?')) {
-                            deleteSparePartListing(s.slug)
-                          }
-                        }}
-                      >
-                        Delete
-                      </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          icon={FileCheck}
+                          onClick={() => setManagingVehicleDocsSlug(v.slug)}
+                        >
+                          Docs
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          icon={Sparkles}
+                          onClick={() => setManagingVehicleFeaturesSlug(v.slug)}
+                        >
+                          Features
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          icon={Sliders}
+                          onClick={() => setManagingVehicleSpecsSlug(v.slug)}
+                        >
+                          Specs
+                        </Button>
+                        {v.status === 'ARCHIVED' ? (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            icon={RefreshCw}
+                            onClick={() => {
+                              if (window.confirm('Restore this archived vehicle listing?')) {
+                                restoreVehicleListing(v.slug)
+                              }
+                            }}
+                          >
+                            Restore
+                          </Button>
+                        ) : (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="text-text-secondary"
+                            onClick={() => {
+                              if (window.confirm('Archive this vehicle listing?')) {
+                                archiveVehicleListing(v.slug)
+                              }
+                            }}
+                          >
+                            Archive
+                          </Button>
+                        )}
+                        <Button size="xs" variant="outline" icon={Pencil} onClick={() => handleOpenEdit(v)}>
+                          Edit
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          icon={Trash2}
+                          className="text-danger border-danger/20 hover:bg-danger/10"
+                          disabled={deletingSlug === v.slug}
+                          onClick={() => handleDeleteVehicle(v.slug)}
+                        >
+                          {deletingSlug === v.slug ? 'Deleting...' : 'Delete'}
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
+
+              {/* API Property Listings */}
+              {propertyListings.map((p) => {
+                const propType = PROPERTY_TYPES.find((t) => t.value === p.propertyType)?.label || titleCaseEnum(p.propertyType || '')
+                const listType = LISTING_TYPES.find((t) => t.value === p.listingType)?.label || titleCaseEnum(p.listingType || '')
+                const primaryImage = p.images?.find((img) => img.isPrimary)?.imageUrl || p.images?.[0]?.imageUrl || p.primaryImage || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=60'
+                return (
+                  <div key={p.slug || p.id} className="group relative flex flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-soft transition-transform hover:-translate-y-0.5">
+                    <div className="flex gap-4">
+                      <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
+                        <img src={primaryImage} alt="" className="h-full w-full object-cover" />
+                        <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-success" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="line-clamp-1 text-sm font-bold text-text">{p.title}</p>
+                          <Badge variant={LISTING_STATUS_VARIANT[p.status] || 'neutral'}>
+                            {LISTING_STATUS_LABEL[p.status] || p.status}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-text-secondary">
+                          Property · {propType} ({listType})
+                        </p>
+                        <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(p.price)}</p>
+                      </div>
+                    </div>
+
+                    {/* Property details schema grid */}
+                    <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-alt/70 p-2.5 font-mono text-[11px] text-text-secondary">
+                      <div><span className="text-text-light">City:</span> {p.city || 'N/A'}</div>
+                      <div><span className="text-text-light">Locality:</span> {p.locality || 'N/A'}</div>
+                      <div><span className="text-text-light">Area:</span> {p.builtUpArea || p.carpetArea || p.plotArea || 'N/A'} {p.areaUnit ? titleCaseEnum(p.areaUnit) : ''}</div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                      <Link to={`/sell/properties?mode=edit&slug=${p.slug}`} className="text-xs font-semibold text-primary hover:underline">
+                        View details &rarr;
+                      </Link>
+                      <div className="flex flex-wrap gap-1.5">
+                        {p.status === 'DRAFT' && (
+                          <Button size="xs" variant="primary" icon={Rocket} onClick={() => submitPropertyListing(p.slug)}>
+                            Submit
+                          </Button>
+                        )}
+                        <Button size="xs" variant="outline" icon={ImagePlus} onClick={() => setManagingImagesForSlug(p.slug)}>
+                          Photos
+                        </Button>
+                        {p.status !== 'AVAILABLE' && (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white"
+                            onClick={() => makeAvailablePropertyListing(p.slug)}
+                          >
+                            Available
+                          </Button>
+                        )}
+                        {p.status !== 'ARCHIVED' && (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-600 hover:text-white"
+                            onClick={() => archivePropertyListing(p.slug)}
+                          >
+                            Archive
+                          </Button>
+                        )}
+                        <Button size="xs" variant="outline" icon={Pencil} to={`/sell/properties?mode=edit&slug=${p.slug}`}>
+                          Edit
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          icon={Trash2}
+                          className="text-danger border-danger/20 hover:bg-danger/10"
+                          disabled={deletingPropSlug === p.slug}
+                          onClick={() => deletePropertyListing(p.slug)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* API Electronics Listings */}
+              {electronicsListings.map((e) => {
+                const electronicsImage = e.images?.[0]?.imageUrl || e.primaryImage || 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?auto=format&fit=crop&w=800&q=60'
+                return (
+                  <div key={e.slug || e.id} className="group relative flex flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-soft transition-transform hover:-translate-y-0.5">
+                    <div className="flex gap-4">
+                      <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
+                        <img src={electronicsImage} alt={e.title} className="h-full w-full object-cover" />
+                        <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-warning" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="line-clamp-1 text-sm font-bold text-text">{e.title}</p>
+                          <Badge variant={LISTING_STATUS_VARIANT[e.status] || 'neutral'}>
+                            {LISTING_STATUS_LABEL[e.status] || e.status}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-text-secondary">
+                          Electronics · {titleCaseEnum(e.type || '')} ({e.brand} {e.model})
+                        </p>
+                        <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(e.price)}</p>
+                      </div>
+                    </div>
+
+                    {/* Electronics details schema grid */}
+                    <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-alt/70 p-2.5 font-mono text-[11px] text-text-secondary">
+                      <div><span className="text-text-light">Type:</span> {titleCaseEnum(e.type || 'N/A')}</div>
+                      <div><span className="text-text-light">Condition:</span> {e.condition || 'N/A'}</div>
+                      <div><span className="text-text-light">Year:</span> {e.purchaseYear || 'N/A'}</div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                      <Link to={`/sell/electronics?mode=edit&slug=${e.slug}`} className="text-xs font-semibold text-primary hover:underline">
+                        View details &rarr;
+                      </Link>
+                      <div className="flex flex-wrap gap-1.5">
+                        {e.status === 'DRAFT' && (
+                          <Button size="xs" variant="primary" icon={Rocket} onClick={() => submitElectronicsListing(e.slug)}>
+                            Submit
+                          </Button>
+                        )}
+                        {e.status !== 'AVAILABLE' && (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white"
+                            onClick={() => makeAvailableElectronicsListing(e.slug)}
+                          >
+                            Available
+                          </Button>
+                        )}
+                        {e.status !== 'ARCHIVED' && (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-600 hover:text-white"
+                            onClick={() => archiveElectronicsListing(e.slug)}
+                          >
+                            Archive
+                          </Button>
+                        )}
+                        <Button size="xs" variant="outline" icon={Pencil} to={`/sell/electronics?mode=edit&slug=${e.slug}`}>
+                          Edit
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          icon={Trash2}
+                          className="text-danger border-danger/20 hover:bg-danger/10"
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this electronics listing?')) {
+                              deleteElectronicsListing(e.slug)
+                            }
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* API Spare Parts Listings */}
+              {sparePartsListings.map((s) => {
+                const spareImage = s.images?.[0]?.imageUrl || s.primaryImage || 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=800&q=60'
+                return (
+                  <div key={s.slug || s.id} className="group relative flex flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-soft transition-transform hover:-translate-y-0.5">
+                    <div className="flex gap-4">
+                      <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
+                        <img src={spareImage} alt={s.title} className="h-full w-full object-cover" />
+                        <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-danger" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="line-clamp-1 text-sm font-bold text-text">
+                            {s.title}
+                          </p>
+                          <Badge variant={LISTING_STATUS_VARIANT[s.status] || 'neutral'}>
+                            {LISTING_STATUS_LABEL[s.status] || s.status}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-text-secondary">
+                          Spare Part · {s.category || 'N/A'} ({s.brand})
+                        </p>
+                        <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(s.price)}</p>
+                      </div>
+                    </div>
+
+                    {/* Spare Part details schema grid */}
+                    <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-alt/70 p-2.5 font-mono text-[11px] text-text-secondary">
+                      <div><span className="text-text-light">Sub:</span> {s.subCategory || 'N/A'}</div>
+                      <div><span className="text-text-light">Part #:</span> {s.partNumber || 'N/A'}</div>
+                      <div><span className="text-text-light">Cond:</span> {s.condition || 'N/A'}</div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                      <Link to={`/sell/spare-parts?mode=edit&slug=${s.slug}`} className="text-xs font-semibold text-primary hover:underline">
+                        View details &rarr;
+                      </Link>
+                      <div className="flex flex-wrap gap-1.5">
+                        {s.status === 'DRAFT' && (
+                          <Button size="xs" variant="primary" icon={Rocket} onClick={() => {
+                            if (window.confirm('Submit this spare part for approval?')) {
+                              submitSparePartListing(s.slug)
+                            }
+                          }}>
+                            Submit
+                          </Button>
+                        )}
+                        {s.status !== 'AVAILABLE' && (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white"
+                            onClick={() => makeAvailableSparePartListing(s.slug)}
+                          >
+                            Available
+                          </Button>
+                        )}
+                        {s.status !== 'ARCHIVED' && (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-600 hover:text-white"
+                            onClick={() => archiveSparePartListing(s.slug)}
+                          >
+                            Archive
+                          </Button>
+                        )}
+                        <Button size="xs" variant="outline" icon={Pencil} to={`/sell/spare-parts?mode=edit&slug=${s.slug}`}>
+                          Edit
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          icon={Trash2}
+                          className="text-danger border-danger/20 hover:bg-danger/10"
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this spare part listing?')) {
+                              deleteSparePartListing(s.slug)
+                            }
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
 
               {/* Local Fallback Listings */}
               {localListings.map((listing) => (
@@ -696,87 +923,286 @@ export default function Dashboard() {
         <div>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <p className="text-sm text-text-secondary">{archivedVehicleListings.length} archived vehicle listing{archivedVehicleListings.length === 1 ? '' : 's'}</p>
+              <p className="text-sm text-text-secondary">{totalArchivedCount} archived listing{totalArchivedCount === 1 ? '' : 's'}</p>
               <button
                 type="button"
-                onClick={() => fetchArchivedListings()}
-                disabled={apiLoading}
+                onClick={() => {
+                  fetchArchivedListings().catch(() => { })
+                  fetchPropertyListings().catch(() => { })
+                  fetchElectronicsListings().catch(() => { })
+                  fetchSparePartsListings().catch(() => { })
+                }}
+                disabled={apiLoading || propertyLoading || electronicsLoading || sparePartsLoading}
                 className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
               >
-                <RefreshCw size={12} className={cn(apiLoading && 'animate-spin')} /> Refresh
+                <RefreshCw size={12} className={cn((apiLoading || propertyLoading || electronicsLoading || sparePartsLoading) && 'animate-spin')} /> Refresh
               </button>
             </div>
           </div>
 
-          {archivedVehicleListings.length === 0 && !apiLoading ? (
+          {totalArchivedCount === 0 && !apiLoading && !propertyLoading && !electronicsLoading && !sparePartsLoading ? (
             <EmptyState
               icon={Archive}
               title="No archived listings"
-              description="Vehicle listings you archive will appear here. You can restore them anytime to make them live again."
+              description="Listings you archive will appear here. You can restore or make them available anytime to make them live again."
             />
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {archivedVehicleListings.map((v) => (
-                <div key={v.slug} className="group relative flex flex-col justify-between rounded-2xl border border-border bg-surface/70 p-5 shadow-soft transition-transform hover:-translate-y-0.5">
-                  <div className="flex gap-4">
-                    <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
-                      <img src={PLACEHOLDER_IMAGE} alt="" className="h-full w-full object-cover grayscale opacity-80" />
-                      <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-text-light" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-2">
-                        <p className="line-clamp-1 text-sm font-bold text-text">
-                          {titleCaseEnum(v.brand)} {v.model} {v.variant}
-                        </p>
-                        <Badge variant="neutral">
-                          ARCHIVED
-                        </Badge>
+              {/* Archived Vehicles */}
+              {archivedVehicleListings.map((v) => {
+                const vehicleImage = v.images?.[0]?.imageUrl || v.primaryImage || 'https://images.unsplash.com/photo-1549399542-7e3f8b79c341?auto=format&fit=crop&w=800&q=60'
+                const vehicleTitle = v.title || `${titleCaseEnum(v.brand)} ${v.model} ${v.variant}`.trim()
+                return (
+                  <div key={v.slug} className="group relative flex flex-col justify-between rounded-2xl border border-border bg-surface/70 p-5 shadow-soft transition-transform hover:-translate-y-0.5">
+                    <div className="flex gap-4">
+                      <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
+                        <img src={vehicleImage} alt={vehicleTitle} className="h-full w-full object-cover grayscale opacity-80" />
+                        <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
                       </div>
-                      <p className="mt-1 text-xs text-text-secondary">
-                        {v.year} · {titleCaseEnum(v.fuelType)} · {titleCaseEnum(v.transmissionType)}
-                      </p>
-                      <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(v.price)}</p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="line-clamp-1 text-sm font-bold text-text">
+                            {vehicleTitle}
+                          </p>
+                          <Badge variant="neutral">
+                            ARCHIVED
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-text-secondary">
+                          Vehicle · {v.year} · {titleCaseEnum(v.fuelType)} · {titleCaseEnum(v.transmissionType)}
+                        </p>
+                        <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(v.price)}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-alt/70 p-2.5 font-mono text-[11px] text-text-secondary">
+                      <div><span className="text-text-light">Reg:</span> {v.registrationNumber || 'N/A'}</div>
+                      <div><span className="text-text-light">VIN:</span> {v.vin || 'N/A'}</div>
+                      <div><span className="text-text-light">Chassis:</span> {v.chassisNumber || 'N/A'}</div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                      <span className="text-xs font-medium text-text-secondary">Archived Vehicle</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          className="border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white"
+                          icon={RefreshCw}
+                          onClick={() => {
+                            if (window.confirm('Restore this archived vehicle listing?')) {
+                              restoreVehicleListing(v.slug)
+                            }
+                          }}
+                        >
+                          Restore
+                        </Button>
+                        <Button size="xs" variant="outline" icon={Pencil} onClick={() => handleOpenEdit(v)}>
+                          Edit
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          icon={Trash2}
+                          className="text-danger border-danger/20 hover:bg-danger/10"
+                          disabled={deletingSlug === v.slug}
+                          onClick={() => handleDeleteVehicle(v.slug)}
+                        >
+                          {deletingSlug === v.slug ? 'Deleting...' : 'Delete'}
+                        </Button>
+                      </div>
                     </div>
                   </div>
+                )
+              })}
 
-                  <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-alt/70 p-2.5 font-mono text-[11px] text-text-secondary">
-                    <div><span className="text-text-light">Reg:</span> {v.registrationNumber || 'N/A'}</div>
-                    <div><span className="text-text-light">VIN:</span> {v.vin || 'N/A'}</div>
-                    <div><span className="text-text-light">Chassis:</span> {v.chassisNumber || 'N/A'}</div>
-                  </div>
+              {/* Archived Properties */}
+              {archivedProperties.map((p) => {
+                const propType = PROPERTY_TYPES.find((t) => t.value === p.propertyType)?.label || titleCaseEnum(p.propertyType || '')
+                const listType = LISTING_TYPES.find((t) => t.value === p.listingType)?.label || titleCaseEnum(p.listingType || '')
+                const primaryImage = p.images?.find((img) => img.isPrimary)?.imageUrl || p.images?.[0]?.imageUrl || p.primaryImage || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=60'
+                return (
+                  <div key={p.slug || p.id} className="group relative flex flex-col justify-between rounded-2xl border border-border bg-surface/70 p-5 shadow-soft transition-transform hover:-translate-y-0.5">
+                    <div className="flex gap-4">
+                      <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
+                        <img src={primaryImage} alt="" className="h-full w-full object-cover grayscale opacity-80" />
+                        <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-success" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="line-clamp-1 text-sm font-bold text-text">{p.title}</p>
+                          <Badge variant="neutral">
+                            ARCHIVED
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-text-secondary">
+                          Property · {propType} ({listType})
+                        </p>
+                        <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(p.price)}</p>
+                      </div>
+                    </div>
 
-                  <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-                    <span className="text-xs font-medium text-text-secondary">Archived</span>
-                    <div className="flex gap-2">
-                      <Button
-                        size="xs"
-                        variant="primary"
-                        icon={RefreshCw}
-                        onClick={() => {
-                          if (window.confirm('Restore this archived vehicle listing?')) {
-                            restoreVehicleListing(v.slug)
-                          }
-                        }}
-                      >
-                        Restore
-                      </Button>
-                      <Button size="xs" variant="outline" icon={Pencil} onClick={() => handleOpenEdit(v)}>
-                        Edit
-                      </Button>
-                      <Button
-                        size="xs"
-                        variant="outline"
-                        icon={Trash2}
-                        className="text-danger border-danger/20 hover:bg-danger/10"
-                        disabled={deletingSlug === v.slug}
-                        onClick={() => handleDeleteVehicle(v.slug)}
-                      >
-                        {deletingSlug === v.slug ? 'Deleting...' : 'Delete'}
-                      </Button>
+                    <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-alt/70 p-2.5 font-mono text-[11px] text-text-secondary">
+                      <div><span className="text-text-light">City:</span> {p.city || 'N/A'}</div>
+                      <div><span className="text-text-light">Locality:</span> {p.locality || 'N/A'}</div>
+                      <div><span className="text-text-light">Area:</span> {p.builtUpArea || p.carpetArea || p.plotArea || 'N/A'} {p.areaUnit ? titleCaseEnum(p.areaUnit) : ''}</div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                      <span className="text-xs font-medium text-text-secondary">Archived Property</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          className="border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white"
+                          onClick={() => makeAvailablePropertyListing(p.slug)}
+                        >
+                          Make Available
+                        </Button>
+                        <Button size="xs" variant="outline" icon={Pencil} to={`/sell/properties?mode=edit&slug=${p.slug}`}>
+                          Edit
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          icon={Trash2}
+                          className="text-danger border-danger/20 hover:bg-danger/10"
+                          disabled={deletingPropSlug === p.slug}
+                          onClick={() => deletePropertyListing(p.slug)}
+                        >
+                          Delete
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
+
+              {/* Archived Electronics */}
+              {archivedElectronics.map((e) => {
+                const electronicsImage = e.images?.[0]?.imageUrl || e.primaryImage || 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?auto=format&fit=crop&w=800&q=60'
+                return (
+                  <div key={e.slug || e.id} className="group relative flex flex-col justify-between rounded-2xl border border-border bg-surface/70 p-5 shadow-soft transition-transform hover:-translate-y-0.5">
+                    <div className="flex gap-4">
+                      <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
+                        <img src={electronicsImage} alt={e.title} className="h-full w-full object-cover grayscale opacity-80" />
+                        <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-warning" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="line-clamp-1 text-sm font-bold text-text">{e.title}</p>
+                          <Badge variant="neutral">
+                            ARCHIVED
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-text-secondary">
+                          Electronics · {titleCaseEnum(e.type || '')} ({e.brand} {e.model})
+                        </p>
+                        <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(e.price)}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-alt/70 p-2.5 font-mono text-[11px] text-text-secondary">
+                      <div><span className="text-text-light">Type:</span> {titleCaseEnum(e.type || 'N/A')}</div>
+                      <div><span className="text-text-light">Condition:</span> {e.condition || 'N/A'}</div>
+                      <div><span className="text-text-light">Year:</span> {e.purchaseYear || 'N/A'}</div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                      <span className="text-xs font-medium text-text-secondary">Archived Electronics</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          className="border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white"
+                          onClick={() => makeAvailableElectronicsListing(e.slug)}
+                        >
+                          Make Available
+                        </Button>
+                        <Button size="xs" variant="outline" icon={Pencil} to={`/sell/electronics?mode=edit&slug=${e.slug}`}>
+                          Edit
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          icon={Trash2}
+                          className="text-danger border-danger/20 hover:bg-danger/10"
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this electronics listing?')) {
+                              deleteElectronicsListing(e.slug)
+                            }
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Archived Spare Parts */}
+              {archivedSpareParts.map((s) => {
+                const spareImage = s.images?.[0]?.imageUrl || s.primaryImage || 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=800&q=60'
+                return (
+                  <div key={s.slug || s.id} className="group relative flex flex-col justify-between rounded-2xl border border-border bg-surface/70 p-5 shadow-soft transition-transform hover:-translate-y-0.5">
+                    <div className="flex gap-4">
+                      <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
+                        <img src={spareImage} alt={s.title} className="h-full w-full object-cover grayscale opacity-80" />
+                        <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-danger" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="line-clamp-1 text-sm font-bold text-text">{s.title}</p>
+                          <Badge variant="neutral">
+                            ARCHIVED
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-text-secondary">
+                          Spare Part · {s.category || 'N/A'} ({s.brand})
+                        </p>
+                        <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(s.price)}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-alt/70 p-2.5 font-mono text-[11px] text-text-secondary">
+                      <div><span className="text-text-light">Sub:</span> {s.subCategory || 'N/A'}</div>
+                      <div><span className="text-text-light">Part #:</span> {s.partNumber || 'N/A'}</div>
+                      <div><span className="text-text-light">Cond:</span> {s.condition || 'N/A'}</div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                      <span className="text-xs font-medium text-text-secondary">Archived Spare Part</span>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          className="border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white"
+                          onClick={() => makeAvailableSparePartListing(s.slug)}
+                        >
+                          Make Available
+                        </Button>
+                        <Button size="xs" variant="outline" icon={Pencil} to={`/sell/spare-parts?mode=edit&slug=${s.slug}`}>
+                          Edit
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          icon={Trash2}
+                          className="text-danger border-danger/20 hover:bg-danger/10"
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this spare part listing?')) {
+                              deleteSparePartListing(s.slug)
+                            }
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>
@@ -890,32 +1316,235 @@ export default function Dashboard() {
         </div>
       )}
 
-      {tab === 'orders' && (
-        <div className="overflow-x-auto rounded-2xl border border-border bg-surface">
-          <table className="w-full min-w-[560px] text-sm">
-            <thead>
-              <tr className="border-b border-border bg-surface-alt text-left text-xs font-bold uppercase tracking-wide text-text-secondary">
-                <th className="p-4">Order ID</th>
-                <th className="p-4">Item</th>
-                <th className="p-4">Amount</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              {userOrders.map((order) => (
-                <tr key={order.id} className="border-b border-border last:border-b-0 hover:bg-surface-alt/50">
-                  <td className="p-4 font-mono text-xs font-semibold text-text">{order.id}</td>
-                  <td className="p-4 text-text-secondary">{order.item}</td>
-                  <td className="p-4 font-mono font-semibold tabular-nums text-text">{formatCurrencyFull(order.amount)}</td>
-                  <td className="p-4">
-                    <Badge variant={ORDER_STATUS_VARIANT[order.status]}>{order.status}</Badge>
-                  </td>
-                  <td className="p-4 text-text-secondary">{order.date}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {tab === 'electronics' && (
+        <div>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-text-secondary">{electronicsListings.length} electronics product{electronicsListings.length === 1 ? '' : 's'}</p>
+              <button
+                type="button"
+                onClick={() => fetchElectronicsListings()}
+                disabled={electronicsLoading}
+                className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+              >
+                <RefreshCw size={12} className={cn(electronicsLoading && 'animate-spin')} /> Refresh
+              </button>
+            </div>
+            <Button to="/sell/electronics" variant="primary" size="sm" icon={Laptop}>
+              Sell Electronics
+            </Button>
+          </div>
+
+          {electronicsListings.length === 0 && !electronicsLoading ? (
+            <EmptyState
+              icon={Laptop}
+              title="No electronics listed yet"
+              description="List mobile phones, laptops, TVs or appliances — our team reviews it before it goes live."
+              actionLabel="Sell Electronics"
+              actionTo="/sell/electronics"
+            />
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {electronicsListings.map((e) => {
+                const electronicsImage = e.images?.[0]?.imageUrl || e.primaryImage || 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?auto=format&fit=crop&w=800&q=60'
+                return (
+                  <div key={e.slug || e.id} className="group relative flex flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-soft transition-transform hover:-translate-y-0.5">
+                    <div className="flex gap-4">
+                      <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
+                        <img src={electronicsImage} alt={e.title} className="h-full w-full object-cover" />
+                        <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-warning" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="line-clamp-1 text-sm font-bold text-text">{e.title}</p>
+                          <Badge variant={LISTING_STATUS_VARIANT[e.status] || 'neutral'}>
+                            {LISTING_STATUS_LABEL[e.status] || e.status}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-text-secondary">
+                          {titleCaseEnum(e.type || '')} · {e.brand} {e.model}
+                        </p>
+                        <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(e.price)}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-alt/70 p-2.5 font-mono text-[11px] text-text-secondary">
+                      <div><span className="text-text-light">Type:</span> {titleCaseEnum(e.type || 'N/A')}</div>
+                      <div><span className="text-text-light">Condition:</span> {e.condition || 'N/A'}</div>
+                      <div><span className="text-text-light">Year:</span> {e.purchaseYear || 'N/A'}</div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                      <Link to={`/sell/electronics?mode=edit&slug=${e.slug}`} className="text-xs font-semibold text-primary hover:underline">
+                        View details &rarr;
+                      </Link>
+                      <div className="flex flex-wrap gap-1.5">
+                        {e.status === 'DRAFT' && (
+                          <Button size="xs" variant="primary" icon={Rocket} onClick={() => submitElectronicsListing(e.slug)}>
+                            Submit
+                          </Button>
+                        )}
+                        {e.status !== 'AVAILABLE' && (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white"
+                            onClick={() => makeAvailableElectronicsListing(e.slug)}
+                          >
+                            Available
+                          </Button>
+                        )}
+                        {e.status !== 'ARCHIVED' && (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-600 hover:text-white"
+                            onClick={() => archiveElectronicsListing(e.slug)}
+                          >
+                            Archive
+                          </Button>
+                        )}
+                        <Button size="xs" variant="outline" icon={Pencil} to={`/sell/electronics?mode=edit&slug=${e.slug}`}>
+                          Edit
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          icon={Trash2}
+                          className="text-danger border-danger/20 hover:bg-danger/10"
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this electronics listing?')) {
+                              deleteElectronicsListing(e.slug)
+                            }
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab === 'spare-parts' && (
+        <div>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-text-secondary">{sparePartsListings.length} spare part{sparePartsListings.length === 1 ? '' : 's'}</p>
+              <button
+                type="button"
+                onClick={() => fetchSparePartsListings()}
+                disabled={sparePartsLoading}
+                className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+              >
+                <RefreshCw size={12} className={cn(sparePartsLoading && 'animate-spin')} /> Refresh
+              </button>
+            </div>
+            <Button to="/sell/spare-parts" variant="primary" size="sm" icon={Wrench}>
+              Sell Spare Part
+            </Button>
+          </div>
+
+          {sparePartsListings.length === 0 && !sparePartsLoading ? (
+            <EmptyState
+              icon={Wrench}
+              title="No spare parts listed yet"
+              description="List batteries, tyres, engine parts or accessories — our team reviews it before it goes live."
+              actionLabel="Sell Spare Part"
+              actionTo="/sell/spare-parts"
+            />
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {sparePartsListings.map((s) => {
+                const spareImage = s.images?.[0]?.imageUrl || s.primaryImage || 'https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?auto=format&fit=crop&w=800&q=60'
+                return (
+                  <div key={s.slug || s.id} className="group relative flex flex-col justify-between rounded-2xl border border-border bg-surface p-5 shadow-soft transition-transform hover:-translate-y-0.5">
+                    <div className="flex gap-4">
+                      <div className="relative h-20 w-24 shrink-0 overflow-hidden rounded-xl bg-surface-alt">
+                        <img src={spareImage} alt={s.title} className="h-full w-full object-cover" />
+                        <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-danger" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="line-clamp-1 text-sm font-bold text-text">{s.title}</p>
+                          <Badge variant={LISTING_STATUS_VARIANT[s.status] || 'neutral'}>
+                            {LISTING_STATUS_LABEL[s.status] || s.status}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-text-secondary">
+                          Spare Part · {s.category || 'N/A'} ({s.brand})
+                        </p>
+                        <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(s.price)}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-3 gap-1 rounded-xl bg-surface-alt/70 p-2.5 font-mono text-[11px] text-text-secondary">
+                      <div><span className="text-text-light">Sub:</span> {s.subCategory || 'N/A'}</div>
+                      <div><span className="text-text-light">Part #:</span> {s.partNumber || 'N/A'}</div>
+                      <div><span className="text-text-light">Cond:</span> {s.condition || 'N/A'}</div>
+                    </div>
+
+                    <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
+                      <Link to={`/sell/spare-parts?mode=edit&slug=${s.slug}`} className="text-xs font-semibold text-primary hover:underline">
+                        View details &rarr;
+                      </Link>
+                      <div className="flex flex-wrap gap-1.5">
+                        {s.status === 'DRAFT' && (
+                          <Button size="xs" variant="primary" icon={Rocket} onClick={() => {
+                            if (window.confirm('Submit this spare part for approval?')) {
+                              submitSparePartListing(s.slug)
+                            }
+                          }}>
+                            Submit
+                          </Button>
+                        )}
+                        {s.status !== 'AVAILABLE' && (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white"
+                            onClick={() => makeAvailableSparePartListing(s.slug)}
+                          >
+                            Available
+                          </Button>
+                        )}
+                        {s.status !== 'ARCHIVED' && (
+                          <Button
+                            size="xs"
+                            variant="outline"
+                            className="border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-600 hover:text-white"
+                            onClick={() => archiveSparePartListing(s.slug)}
+                          >
+                            Archive
+                          </Button>
+                        )}
+                        <Button size="xs" variant="outline" icon={Pencil} to={`/sell/spare-parts?mode=edit&slug=${s.slug}`}>
+                          Edit
+                        </Button>
+                        <Button
+                          size="xs"
+                          variant="outline"
+                          icon={Trash2}
+                          className="text-danger border-danger/20 hover:bg-danger/10"
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this spare part listing?')) {
+                              deleteSparePartListing(s.slug)
+                            }
+                          }}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -1013,11 +1642,11 @@ export default function Dashboard() {
         </div>
       )}
 
-      {tab === 'reviews' && (
+      {/* {tab === 'reviews' && (
         <div className="max-w-4xl">
           <SellerReviewSection sellerId={user?.id || '3fa85f64-5717-4562-b3fc-2c963f66afa6'} sellerName={user?.name || 'Seller'} />
         </div>
-      )}
+      )} */}
 
       {/* Edit Vehicle Modal */}
       {editingVehicle && (

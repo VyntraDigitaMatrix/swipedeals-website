@@ -1,6 +1,18 @@
 import { useState, useCallback } from 'react'
 import { electronicsListingService } from '../services/electronicsListingService'
 
+function getValidListingItem(res, fallbackStatus, currentItem) {
+  const candidate = res?.data ?? res
+  if (candidate && typeof candidate === 'object' && (candidate.title || candidate.slug || candidate.id)) {
+    const statusVal = typeof candidate.status === 'string' && candidate.status !== '200' ? candidate.status : fallbackStatus
+    return { ...currentItem, ...candidate, status: statusVal }
+  }
+  return {
+    ...currentItem,
+    status: fallbackStatus || currentItem?.status || 'APPROVED',
+  }
+}
+
 export function useElectronicsListings() {
   const [listings, setListings] = useState([])
   const [pagination, setPagination] = useState({
@@ -66,9 +78,8 @@ export function useElectronicsListings() {
     setError(null)
     try {
       const res = await electronicsListingService.patch(slug, payload)
-      const updated = res?.data ?? res
-      setListings((prev) => prev.map((item) => (item.slug === slug ? updated : item)))
-      return updated
+      setListings((prev) => prev.map((item) => (item.slug === slug ? getValidListingItem(res, item.status, item) : item)))
+      return res
     } catch (err) {
       const errMsg = err?.response?.data?.message || err?.message || 'Failed to update electronics listing.'
       setError(errMsg)
@@ -99,9 +110,9 @@ export function useElectronicsListings() {
     setError(null)
     try {
       const res = await electronicsListingService.submit(slug)
-      const updated = res?.data ?? res
-      setListings((prev) => prev.map((item) => (item.slug === slug ? updated : item)))
-      return updated
+      setListings((prev) => prev.map((item) => (item.slug === slug ? getValidListingItem(res, 'PENDING_APPROVAL', item) : item)))
+      fetchListings().catch(() => {})
+      return res
     } catch (err) {
       const errMsg = err?.response?.data?.message || err?.message || 'Failed to submit electronics listing.'
       setError(errMsg)
@@ -109,7 +120,41 @@ export function useElectronicsListings() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [fetchListings])
+
+  const makeAvailableListing = useCallback(async (slug) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await electronicsListingService.makeAvailable(slug)
+      setListings((prev) => prev.map((item) => (item.slug === slug ? getValidListingItem(res, 'AVAILABLE', item) : item)))
+      fetchListings().catch(() => {})
+      return res
+    } catch (err) {
+      const errMsg = err?.response?.data?.message || err?.message || 'Failed to make electronics listing available.'
+      setError(errMsg)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [fetchListings])
+
+  const archiveListing = useCallback(async (slug) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await electronicsListingService.archive(slug)
+      setListings((prev) => prev.map((item) => (item.slug === slug ? getValidListingItem(res, 'ARCHIVED', item) : item)))
+      fetchListings().catch(() => {})
+      return res
+    } catch (err) {
+      const errMsg = err?.response?.data?.message || err?.message || 'Failed to archive electronics listing.'
+      setError(errMsg)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [fetchListings])
 
   return {
     listings,
@@ -121,6 +166,8 @@ export function useElectronicsListings() {
     patchListing,
     deleteListing,
     submitListing,
+    makeAvailableListing,
+    archiveListing,
   }
 }
 

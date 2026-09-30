@@ -1,6 +1,18 @@
 import { useState, useCallback } from 'react'
 import { propertyListingService } from '../services/propertyListingService'
 
+function getValidListingItem(res, fallbackStatus, currentItem) {
+  const candidate = res?.data ?? res
+  if (candidate && typeof candidate === 'object' && (candidate.title || candidate.slug || candidate.id)) {
+    const statusVal = typeof candidate.status === 'string' && candidate.status !== '200' ? candidate.status : fallbackStatus
+    return { ...currentItem, ...candidate, status: statusVal }
+  }
+  return {
+    ...currentItem,
+    status: fallbackStatus || currentItem?.status || 'APPROVED',
+  }
+}
+
 export function usePropertyListings() {
   const [listings, setListings] = useState([])
   const [pagination, setPagination] = useState({
@@ -67,7 +79,7 @@ export function usePropertyListings() {
     try {
       const res = await propertyListingService.patch(slug, payload)
       const updated = res?.data ?? res
-      setListings((prev) => prev.map((item) => (item.slug === slug ? updated : item)))
+      setListings((prev) => prev.map((item) => (item.slug === slug ? getValidListingItem(res, item.status, item) : item)))
       return updated
     } catch (err) {
       const errMsg = err?.response?.data?.message || err?.message || 'Failed to update property listing.'
@@ -99,9 +111,9 @@ export function usePropertyListings() {
     setError(null)
     try {
       const res = await propertyListingService.submit(slug)
-      const updated = res?.data ?? res
-      setListings((prev) => prev.map((item) => (item.slug === slug ? updated : item)))
-      return updated
+      setListings((prev) => prev.map((item) => (item.slug === slug ? getValidListingItem(res, 'PENDING_APPROVAL', item) : item)))
+      fetchListings().catch(() => {})
+      return res
     } catch (err) {
       const errMsg = err?.response?.data?.message || err?.message || 'Failed to submit property listing.'
       setError(errMsg)
@@ -109,7 +121,41 @@ export function usePropertyListings() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [fetchListings])
+
+  const makeAvailableListing = useCallback(async (slug) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await propertyListingService.makeAvailable(slug)
+      setListings((prev) => prev.map((item) => (item.slug === slug ? getValidListingItem(res, 'AVAILABLE', item) : item)))
+      fetchListings().catch(() => {})
+      return res
+    } catch (err) {
+      const errMsg = err?.response?.data?.message || err?.message || 'Failed to make property available.'
+      setError(errMsg)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [fetchListings])
+
+  const archiveListing = useCallback(async (slug) => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await propertyListingService.archive(slug)
+      setListings((prev) => prev.map((item) => (item.slug === slug ? getValidListingItem(res, 'ARCHIVED', item) : item)))
+      fetchListings().catch(() => {})
+      return res
+    } catch (err) {
+      const errMsg = err?.response?.data?.message || err?.message || 'Failed to archive property listing.'
+      setError(errMsg)
+      throw err
+    } finally {
+      setLoading(false)
+    }
+  }, [fetchListings])
 
   return {
     listings,
@@ -121,6 +167,8 @@ export function usePropertyListings() {
     patchListing,
     deleteListing,
     submitListing,
+    makeAvailableListing,
+    archiveListing,
   }
 }
 

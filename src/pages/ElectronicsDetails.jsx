@@ -5,6 +5,7 @@ import DetailLayout from '../components/listing/DetailLayout'
 import ElectronicsCard from '../components/electronics/ElectronicsCard'
 import EmptyState from '../components/common/EmptyState'
 import { electronicsService, mapElectronicsToCard, extractImages } from '../services/publicListingService'
+import { electronicsListingService } from '../services/electronicsListingService'
 import { usePublicImages } from '../hooks/usePublicImages'
 import { PLACEHOLDER_IMAGE, titleCaseEnum } from '../utils/enumFormat'
 import { formatCurrencyFull, formatDate } from '../utils/format'
@@ -21,17 +22,44 @@ export default function ElectronicsDetails() {
     let cancelled = false
     setLoading(true)
     setNotFound(false)
-    electronicsService
-      .getBySlug(slug)
-      .then((res) => {
-        if (!cancelled) setRaw(res?.data ?? null)
-      })
-      .catch(() => {
-        if (!cancelled) setNotFound(true)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+
+    const fetchElectronics = async () => {
+      let data = null
+      try {
+        const res = await electronicsService.getBySlug(slug)
+        const candidate = (res?.data && typeof res.data === 'object' && (res.data.slug || res.data.id || res.data.title)) ? res.data : res
+        if (candidate && (candidate.slug || candidate.id || candidate.title)) {
+          data = candidate
+        }
+      } catch (e) {
+        // Public endpoint failed
+      }
+
+      if (!data) {
+        try {
+          const sellerRes = await electronicsListingService.getBySlug(slug)
+          const candidate = (sellerRes?.data && typeof sellerRes.data === 'object' && (sellerRes.data.slug || sellerRes.data.id || sellerRes.data.title)) ? sellerRes.data : sellerRes
+          if (candidate && (candidate.slug || candidate.id || candidate.title)) {
+            data = candidate
+          }
+        } catch (e) {
+          // Seller service failed
+        }
+      }
+
+      if (!cancelled) {
+        if (data) {
+          setRaw(data)
+        } else {
+          setNotFound(true)
+        }
+      }
+    }
+
+    fetchElectronics().finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+
     return () => { cancelled = true }
   }, [slug])
 

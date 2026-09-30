@@ -119,7 +119,7 @@ export default function SellProduct() {
   }, [searchParams, navigate])
 
   useEffect(() => {
-    fetchListings().catch(() => {})
+    fetchListings().catch(() => { })
   }, [fetchListings])
 
   // View state: 'create' or 'listings'
@@ -407,8 +407,8 @@ export default function SellProduct() {
                     active
                       ? 'bg-primary text-white shadow-soft'
                       : step.disabled
-                      ? 'cursor-not-allowed text-text-light/50 bg-surface-alt/40'
-                      : 'bg-surface text-text-secondary hover:bg-surface-alt hover:text-text'
+                        ? 'cursor-not-allowed text-text-light/50 bg-surface-alt/40'
+                        : 'bg-surface text-text-secondary hover:bg-surface-alt hover:text-text'
                   )}
                 >
                   {step.label}
@@ -730,14 +730,14 @@ export default function SellProduct() {
 
                 const featuresCount = Array.isArray(v.features)
                   ? v.features.reduce((acc, item) => {
-                      if (Array.isArray(item.features)) {
-                        return acc + item.features.filter((f) => f.available).length
-                      }
-                      if (item?.available) {
-                        return acc + 1
-                      }
-                      return acc
-                    }, 0)
+                    if (Array.isArray(item.features)) {
+                      return acc + item.features.filter((f) => f.available).length
+                    }
+                    if (item?.available) {
+                      return acc + 1
+                    }
+                    return acc
+                  }, 0)
                   : 0
 
                 return (

@@ -5,6 +5,7 @@ import DetailLayout from '../components/listing/DetailLayout'
 import CommercialVehicleCard from '../components/vehicle/CommercialVehicleCard'
 import EmptyState from '../components/common/EmptyState'
 import { vehicleService, mapVehicleToCommercialCard, extractImages } from '../services/publicListingService'
+import { vehicleListingService } from '../services/vehicleListingService'
 import { usePublicImages } from '../hooks/usePublicImages'
 import { PLACEHOLDER_IMAGE } from '../utils/enumFormat'
 import { formatCurrencyFull, formatDate } from '../utils/format'
@@ -21,17 +22,44 @@ export default function CommercialVehicleDetails() {
     let cancelled = false
     setLoading(true)
     setNotFound(false)
-    vehicleService
-      .getBySlug(slug)
-      .then((res) => {
-        if (!cancelled) setRaw(res?.data ?? null)
-      })
-      .catch(() => {
-        if (!cancelled) setNotFound(true)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+
+    const fetchVehicle = async () => {
+      let data = null
+      try {
+        const res = await vehicleService.getBySlug(slug)
+        const candidate = (res?.data && typeof res.data === 'object' && (res.data.slug || res.data.id || res.data.brand)) ? res.data : res
+        if (candidate && (candidate.slug || candidate.id || candidate.brand)) {
+          data = candidate
+        }
+      } catch (e) {
+        // Public endpoint failed
+      }
+
+      if (!data) {
+        try {
+          const sellerRes = await vehicleListingService.getBySlug(slug)
+          const candidate = (sellerRes?.data && typeof sellerRes.data === 'object' && (sellerRes.data.slug || sellerRes.data.id || sellerRes.data.brand)) ? sellerRes.data : sellerRes
+          if (candidate && (candidate.slug || candidate.id || candidate.brand)) {
+            data = candidate
+          }
+        } catch (e) {
+          // Seller service failed
+        }
+      }
+
+      if (!cancelled) {
+        if (data) {
+          setRaw(data)
+        } else {
+          setNotFound(true)
+        }
+      }
+    }
+
+    fetchVehicle().finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+
     return () => { cancelled = true }
   }, [slug])
 

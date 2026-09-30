@@ -5,6 +5,7 @@ import DetailLayout from '../components/listing/DetailLayout'
 import PropertyCard from '../components/property/PropertyCard'
 import EmptyState from '../components/common/EmptyState'
 import { propertyService, mapPropertyToCard, extractImages } from '../services/publicListingService'
+import { propertyListingService } from '../services/propertyListingService'
 import { usePublicImages } from '../hooks/usePublicImages'
 import { PLACEHOLDER_IMAGE, titleCaseEnum } from '../utils/enumFormat'
 import { formatCurrencyFull, formatDate } from '../utils/format'
@@ -21,17 +22,44 @@ export default function PropertyDetails() {
     let cancelled = false
     setLoading(true)
     setNotFound(false)
-    propertyService
-      .getBySlug(slug)
-      .then((res) => {
-        if (!cancelled) setRaw(res?.data ?? null)
-      })
-      .catch(() => {
-        if (!cancelled) setNotFound(true)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
+
+    const fetchProperty = async () => {
+      let data = null
+      try {
+        const res = await propertyService.getBySlug(slug)
+        const candidate = (res?.data && typeof res.data === 'object' && (res.data.slug || res.data.id || res.data.title)) ? res.data : res
+        if (candidate && (candidate.slug || candidate.id || candidate.title)) {
+          data = candidate
+        }
+      } catch (e) {
+        // Public endpoint failed
+      }
+
+      if (!data) {
+        try {
+          const sellerRes = await propertyListingService.getBySlug(slug)
+          const candidate = (sellerRes?.data && typeof sellerRes.data === 'object' && (sellerRes.data.slug || sellerRes.data.id || sellerRes.data.title)) ? sellerRes.data : sellerRes
+          if (candidate && (candidate.slug || candidate.id || candidate.title)) {
+            data = candidate
+          }
+        } catch (e) {
+          // Seller service failed
+        }
+      }
+
+      if (!cancelled) {
+        if (data) {
+          setRaw(data)
+        } else {
+          setNotFound(true)
+        }
+      }
+    }
+
+    fetchProperty().finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+
     return () => { cancelled = true }
   }, [slug])
 
