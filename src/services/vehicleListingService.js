@@ -146,7 +146,7 @@ export const SPEC_CATEGORIES = [
   { value: 'DIMENSIONS_AND_CAPACITY', label: 'Dimensions & Capacity' },
   { value: 'ENGINE_AND_TRANSMISSION', label: 'Engine & Transmission' },
   { value: 'FUEL_AND_PERFORMANCE', label: 'Fuel & Performance' },
-  { value: 'SUSPENSION_STEERING_BRAKES', label: 'Suspension, Steering & Brakes' },
+  { value: 'SUSPENSION_STEERING_AND_BRAKES', label: 'Suspension, Steering & Brakes' },
   { value: 'OTHER', label: 'Other Specifications' },
 ]
 
@@ -447,6 +447,34 @@ export const vehicleFeatureService = {
 
   updateFeatures: async (slug, featuresPayload) => {
     const res = await api.put(`/api/user/vehicles/${encodeURIComponent(slug)}/features`, featuresPayload)
+    return res.data
+  },
+}
+
+/**
+ * Service for the admin vehicle feature master catalog.
+ * GET /api/admin/vehicle-feature-masters
+ * Returns the full list of all features available to be assigned to any vehicle.
+ */
+export const featureMasterService = {
+  /**
+   * GET /api/admin/vehicle-feature-masters/vehicle-type/{vehicleType}
+   * Returns only features that belong to the given vehicle type.
+   * @param {string} vehicleType - e.g. 'CARS', 'TWO_WHEELER', 'COMMERCIAL_VEHICLES'
+   */
+  getFeaturesByVehicleType: async (vehicleType) => {
+    let mappedType = 'CAR' // Default fallback
+    if (vehicleType) {
+      const vType = vehicleType.toUpperCase()
+      if (vType === 'CARS' || vType === 'CAR') mappedType = 'CAR'
+      else if (vType === 'TWO_WHEELER' || vType === 'BIKE') mappedType = 'TWO_WHEELER'
+      else if (vType === 'COMMERCIAL_VEHICLES' || vType === 'COMMERCIAL_VEHICLE' || vType === 'TRUCK') mappedType = 'COMMERCIAL'
+      else if (vType === 'CONSTRUCTION_VEHICLES' || vType === 'CONSTRUCTION_VEHICLE' || vType === 'CONSTRUCTION') mappedType = 'CONSTRUCTION'
+      else if (vType === 'OTHERS' || vType === 'OTHER') mappedType = 'OTHER'
+      else mappedType = vType // Trust the passed value if not in the map
+    }
+    
+    const res = await api.get(`/api/admin/vehicle-feature-masters/vehicle-type/${encodeURIComponent(mappedType)}`)
     return res.data
   },
 }

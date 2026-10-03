@@ -34,7 +34,7 @@ export default function WishlistButton({ slug, id, category, className, size = 1
       title={!isAuthenticated ? 'Log in to save to wishlist' : undefined}
       className={cn(
         'flex items-center justify-center rounded-full p-2 shadow-soft transition-colors',
-        active ? 'bg-primary text-white' : 'bg-white/90 text-text-secondary hover:text-primary',
+        active ? 'bg-white text-primary' : 'bg-white/90 text-text-secondary hover:text-primary',
         !isAuthenticated && 'opacity-60 cursor-not-allowed',
         className
       )}

@@ -81,6 +81,7 @@ function App() {
         <Route path="/user-activation" element={<UserActivation />} />
         <Route element={<PrivateRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard/:tab" element={<Dashboard />} />
         </Route>
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/listing/:id" element={<ListingDetails />} />

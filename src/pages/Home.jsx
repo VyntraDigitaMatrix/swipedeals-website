@@ -54,10 +54,10 @@ const CATEGORY_LABELS = {
 
 // ── Category-tab browse section ─────────────────────────────────────────────
 const BROWSE_TABS = [
-  { id: 'vehicles',     label: 'Buy Vehicles',  icon: CarFront,   activeClass: 'bg-primary border-transparent text-white shadow-sm',        inactiveClass: 'border-border bg-surface text-text-secondary hover:bg-surface-alt' },
-  { id: 'properties',   label: 'Properties',    icon: Building2,  activeClass: 'bg-emerald-600 border-transparent text-white shadow-sm',    inactiveClass: 'border-border bg-surface text-text-secondary hover:bg-surface-alt' },
-  { id: 'spare-parts',  label: 'Spare Parts',   icon: Wrench,     activeClass: 'bg-amber-600 border-transparent text-white shadow-sm',      inactiveClass: 'border-border bg-surface text-text-secondary hover:bg-surface-alt' },
-  { id: 'electronics',  label: 'Electronics',   icon: Laptop,     activeClass: 'bg-purple-600 border-transparent text-white shadow-sm',     inactiveClass: 'border-border bg-surface text-text-secondary hover:bg-surface-alt' },
+  { id: 'vehicles', label: 'Buy Vehicles', icon: CarFront, activeClass: 'bg-primary border-transparent text-white shadow-sm', inactiveClass: 'border-border bg-surface text-text-secondary hover:bg-surface-alt' },
+  { id: 'properties', label: 'Properties', icon: Building2, activeClass: 'bg-emerald-600 border-transparent text-white shadow-sm', inactiveClass: 'border-border bg-surface text-text-secondary hover:bg-surface-alt' },
+  { id: 'spare-parts', label: 'Spare Parts', icon: Wrench, activeClass: 'bg-amber-600 border-transparent text-white shadow-sm', inactiveClass: 'border-border bg-surface text-text-secondary hover:bg-surface-alt' },
+  { id: 'electronics', label: 'Electronics', icon: Laptop, activeClass: 'bg-purple-600 border-transparent text-white shadow-sm', inactiveClass: 'border-border bg-surface text-text-secondary hover:bg-surface-alt' },
 ]
 
 function SectionLoader() {
@@ -78,11 +78,6 @@ function EmptyState({ label, to }) {
 }
 
 export default function Home() {
-  const { isAuthenticated } = useAuth()
-
-  if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />
-  }
 
   // Community listings (user-submitted)
   const { approved: approvedUserListings } = useListingsStore()
@@ -94,17 +89,17 @@ export default function Home() {
   }))
 
   // API data state
-  const [vehicles,    setVehicles]    = useState([])
-  const [commercial,  setCommercial]  = useState([])
+  const [vehicles, setVehicles] = useState([])
+  const [commercial, setCommercial] = useState([])
   const [electronics, setElectronics] = useState([])
-  const [spareParts,  setSpareParts]  = useState([])
-  const [properties,  setProperties]  = useState([])
+  const [spareParts, setSpareParts] = useState([])
+  const [properties, setProperties] = useState([])
 
-  const [loadingVehicles,    setLoadingVehicles]    = useState(true)
-  const [loadingCommercial,  setLoadingCommercial]  = useState(true)
+  const [loadingVehicles, setLoadingVehicles] = useState(true)
+  const [loadingCommercial, setLoadingCommercial] = useState(true)
   const [loadingElectronics, setLoadingElectronics] = useState(true)
-  const [loadingSpareParts,  setLoadingSpareParts]  = useState(true)
-  const [loadingProperties,  setLoadingProperties]  = useState(true)
+  const [loadingSpareParts, setLoadingSpareParts] = useState(true)
+  const [loadingProperties, setLoadingProperties] = useState(true)
 
   // Browse-tab state
   const [activeTab, setActiveTab] = useState('vehicles')
@@ -165,24 +160,24 @@ export default function Home() {
     return () => { cancelled = true }
   }, [])
 
-  const tabRoutes  = { vehicles: '/cars', properties: '/properties', 'spare-parts': '/spare-parts', electronics: '/electronics' }
-  const tabLabels  = { vehicles: 'All Vehicles', properties: 'All Properties', 'spare-parts': 'All Spare Parts', electronics: 'All Electronics' }
+  const tabRoutes = { vehicles: '/cars', properties: '/properties', 'spare-parts': '/spare-parts', electronics: '/electronics' }
+  const tabLabels = { vehicles: 'All Vehicles', properties: 'All Properties', 'spare-parts': 'All Spare Parts', electronics: 'All Electronics' }
 
   const browseLoading = {
-    vehicles:    loadingVehicles,
-    properties:  loadingProperties,
+    vehicles: loadingVehicles,
+    properties: loadingProperties,
     'spare-parts': loadingSpareParts,
     electronics: loadingElectronics,
   }
 
   const browseData = {
-    vehicles:    vehicles,
-    properties:  properties,
+    vehicles: vehicles,
+    properties: properties,
     'spare-parts': spareParts,
     electronics: electronics,
   }
 
-  const activeItems   = browseData[activeTab]   || []
+  const activeItems = browseData[activeTab] || []
   const activeLoading = browseLoading[activeTab] ?? false
 
   return (

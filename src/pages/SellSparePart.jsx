@@ -421,7 +421,7 @@ export default function SellSparePart() {
 
       {/* MODE 1: CREATE / EDIT SPARE PART FORM */}
       {viewMode === 'create' && (
-        <div className="mx-auto max-w-3xl">
+        <div className="mx-auto max-w-full">
           {editingSlug && (
             <div className="mb-6 flex items-center justify-between rounded-xl bg-primary/10 p-4 text-sm font-semibold text-primary">
               <span>Editing Spare Part: {editingSlug}</span>
@@ -431,7 +431,7 @@ export default function SellSparePart() {
             </div>
           )}
 
-          <div className="mb-6 flex flex-wrap gap-1 border-b border-border">
+          <div className="mb-6 flex flex-wrap gap-6 border-b border-border">
             {TABS.map((tab) => (
               <button
                 key={tab.id}

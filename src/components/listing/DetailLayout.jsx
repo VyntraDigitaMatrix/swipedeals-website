@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import { BadgeCheck, MapPin, MessageCircle, Phone, ShieldCheck } from 'lucide-react'
@@ -10,6 +10,7 @@ import WishlistButton from '../common/WishlistButton'
 import Button from '../buttons/Button'
 import SellerReviewSection from '../seller/SellerReviewSection'
 import ChatDrawer from '../chat/ChatDrawer'
+import ContactSellerModal from './ContactSellerModal'
 import { getDealerById } from '../../data/dealers'
 
 /**
@@ -30,9 +31,30 @@ export default function DetailLayout({
   belowContact,
 }) {
   const [chatOpen, setChatOpen] = useState(false)
+  const [contactOpen, setContactOpen] = useState(false)
+  const [topVal, setTopVal] = useState('6rem')
+  const rightColRef = useRef(null)
+
   const dealer = getDealerById(item.dealerId)
   const effectiveSellerId = item.sellerId || dealer?.id || item.id || '3fa85f64-5717-4562-b3fc-2c963f66afa6'
   const sellerName = dealer?.name || item.sellerName || item.brand || 'Seller'
+
+  useEffect(() => {
+    if (!rightColRef.current) return
+    const observer = new ResizeObserver((entries) => {
+      const height = entries[0].contentRect.height
+      const viewportHeight = window.innerHeight
+      if (height + 140 > viewportHeight) {
+        // Taller than viewport: calculate top so bottom edge sticks
+        setTopVal(`calc(100vh - ${height}px - 1.5rem)`)
+      } else {
+        // Shorter than viewport: stick to top
+        setTopVal('6rem')
+      }
+    })
+    observer.observe(rightColRef.current)
+    return () => observer.disconnect()
+  }, [])
 
   return (
     <div className="container-page py-8">
@@ -60,7 +82,7 @@ export default function DetailLayout({
                 )}
                 <Rating value={item.rating} reviews={dealer?.reviews} className="mt-2" />
               </div>
-              <WishlistButton id={item.id} size={20} className="shrink-0 !bg-surface-alt" />
+              <WishlistButton slug={item.slug} id={item.id} category={item.wishlistCategory || item.category} size={20} className="shrink-0 !bg-surface-alt" />
             </div>
 
             {specs.length > 0 && (
@@ -92,11 +114,18 @@ export default function DetailLayout({
           </motion.div>
         </div>
 
-        <div className="space-y-5">
-          <div className="rounded-2xl border border-border bg-surface p-6 shadow-soft">
+        {/* Right Column Grid Item (stretches to full height by default) */}
+        <div>
+          {/* Inner sticky container */}
+          <div 
+            ref={rightColRef}
+            className="space-y-5 lg:sticky transition-all duration-75" 
+            style={{ top: topVal }}
+          >
+            <div className="rounded-2xl border border-border bg-surface p-6 shadow-soft">
             {priceBlock}
             <div className="mt-5 flex flex-col gap-2.5">
-              <Button variant="primary" fullWidth icon={Phone} onClick={() => setChatOpen(true)}>
+              <Button variant="primary" fullWidth icon={Phone} onClick={() => setContactOpen(true)}>
                 Contact Seller
               </Button>
               <Button variant="outline" fullWidth icon={MessageCircle} onClick={() => setChatOpen(true)}>
@@ -150,6 +179,7 @@ export default function DetailLayout({
               </div>
             </div>
           ) : null}
+          </div>
         </div>
       </div>
 
@@ -165,6 +195,13 @@ export default function DetailLayout({
         onClose={() => setChatOpen(false)}
         recipientId={effectiveSellerId}
         title={`Chat with ${sellerName}`}
+      />
+
+      <ContactSellerModal
+        isOpen={contactOpen}
+        onClose={() => setContactOpen(false)}
+        productSlug={item.slug}
+        productType={item.productType || 'VEHICLE'}
       />
     </div>
   )

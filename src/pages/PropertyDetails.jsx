@@ -97,6 +97,8 @@ export default function PropertyDetails() {
   const mapped = mapPropertyToCard(raw)
   const property = {
     ...mapped,
+    slug: mapped?.slug || raw?.slug || slug,
+    id: mapped?.id || raw?.id || slug,
     images: images.length > 0 && images[0] !== PLACEHOLDER_IMAGE ? images : propImages,
     location: [raw.locality, raw.city, raw.pincode].filter(Boolean).join(', ') || mapped.location,
     sellerId: raw.seller?.sellerId || raw.sellerId || mapped.sellerId,

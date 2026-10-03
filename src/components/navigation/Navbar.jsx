@@ -33,6 +33,7 @@ import { useScrollPosition } from '../../hooks/useScrollPosition'
 import { useWishlist } from '../../hooks/useWishlist'
 import { useAuth } from '../../hooks/useAuth'
 import { useKyc } from '../../hooks/useKyc'
+import { useUserProfile } from '../../hooks/useUserProfile'
 import { useOnClickOutside } from '../../hooks/useOnClickOutside'
 import navLinks from './navLinks'
 import { cn } from '../../utils/cn'
@@ -156,11 +157,10 @@ export default function Navbar() {
                         setSelectedCity(city)
                         setLocationOpen(false)
                       }}
-                      className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-xs text-left transition-colors ${
-                        selectedCity === city
+                      className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-xs text-left transition-colors ${selectedCity === city
                           ? 'bg-primary/10 font-bold text-primary'
                           : 'text-text hover:bg-surface-alt font-medium'
-                      }`}
+                        }`}
                     >
                       <span>{city}</span>
                       {selectedCity === city && <Check size={13} className="text-primary" />}
@@ -456,15 +456,20 @@ function UserMenu({ user, onLogout }) {
   const navigate = useNavigate()
   useOnClickOutside(ref, () => setOpen(false))
   const { isKycVerified } = useKyc()
+  const { profile } = useUserProfile()
 
-  const displayName = user?.name || (user?.phone ? `+91 ${user.phone}` : 'Account')
+  // Priority: real API profile name > auth store name > phone > fallback
+  const displayName =
+    profile?.fullName ||
+    user?.name ||
+    (user?.phone ? `+91 ${user.phone}` : 'Account')
   const initial = displayName ? displayName.charAt(0).toUpperCase() : 'U'
 
   const menuItems = [
     { label: 'Profile', to: '/profile', icon: User },
     { label: 'Wishlist', to: '/wishlist', icon: Heart },
     { label: 'My Dashboard', to: '/dashboard', icon: LayoutDashboard },
-    { label: 'My Listings', to: '/sell/car', icon: ShoppingBag },
+    { label: 'My Listings', to: '/dashboard/listings', icon: ShoppingBag },
     { label: isKycVerified ? 'KYC Verified' : 'Complete KYC', to: '/kyc', icon: BadgeCheck },
   ]
 
@@ -487,10 +492,12 @@ function UserMenu({ user, onLogout }) {
           open ? 'bg-primary/10 border-primary/40' : 'bg-surface-alt hover:bg-surface'
         )}
       >
+        {/* Avatar: first letter of the user's name */}
         <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary-dark text-xs font-bold text-white shadow-lift">
           {initial}
         </span>
-        <span className="hidden sm:inline text-xs font-bold text-text truncate max-w-[90px]">{displayName}</span>
+        {/* Display name — always visible */}
+        <span className="text-xs font-bold text-text truncate max-w-[90px]">{displayName}</span>
         <ChevronDown size={13} className={cn('text-text-secondary transition-transform', open && 'rotate-180 text-primary')} aria-hidden="true" />
       </button>
 

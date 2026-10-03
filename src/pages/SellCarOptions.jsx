@@ -6,17 +6,6 @@ import Badge from '../components/common/Badge'
 
 const OPTIONS = [
   {
-    id: 'verify',
-    icon: ShieldCheck,
-    badge: 'Fastest & Hassle-Free',
-    badgeVariant: 'success',
-    title: 'Get Your Car Verified & Sold',
-    description: 'Free doorstep inspection by our experts, an instant fair-market valuation, and we handle the entire sale for you — just like Spinny.',
-    features: ['Free 200-point doorstep inspection', 'Instant, no-obligation price offer', 'We manage paperwork & payment'],
-    cta: 'Start Free Verification',
-    to: '/sell/car/verify',
-  },
-  {
     id: 'post',
     icon: Megaphone,
     badge: 'Most Popular',

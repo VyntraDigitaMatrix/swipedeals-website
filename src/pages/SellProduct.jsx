@@ -391,9 +391,9 @@ export default function SellProduct() {
 
       {/* MODE 1: CREATE VEHICLE FLOW */}
       {viewMode === 'create' && (
-        <div className="mx-auto max-w-4xl">
+        <div className="mx-auto max-w-full">
           {/* Step Navigation Tabs */}
-          <div className="mb-6 flex flex-wrap gap-2 border-b border-border pb-3">
+          <div className="mb-6 flex flex-wrap gap-6 border-b border-border pb-3">
             {CREATION_STEPS.map((step) => {
               const active = activeStep === step.id
               return (
@@ -627,7 +627,7 @@ export default function SellProduct() {
           {activeStep === 'features' && (
             <div className="rounded-2xl border border-border bg-surface p-6 shadow-soft sm:p-8">
               {createdSlug ? (
-                <VehicleFeaturesManager slug={createdSlug} />
+                <VehicleFeaturesManager slug={createdSlug} vehicleType={form.vehicleType} />
               ) : (
                 <div className="py-12 text-center text-xs text-text-secondary">
                   Please click <strong>Save Changes</strong> on Step 1 (Details) first to create the vehicle.
@@ -731,12 +731,12 @@ export default function SellProduct() {
                 const featuresCount = Array.isArray(v.features)
                   ? v.features.reduce((acc, item) => {
                     if (Array.isArray(item.features)) {
-                      return acc + item.features.filter((f) => f.available).length
+                      return acc + item.features.filter((f) => f.available !== false).length
                     }
-                    if (item?.available) {
-                      return acc + 1
+                    if (item?.available === false) {
+                      return acc
                     }
-                    return acc
+                    return acc + 1
                   }, 0)
                   : 0
 
@@ -949,7 +949,7 @@ export default function SellProduct() {
         <VehicleSpecsManager slug={modalSlug} onClose={() => { setModalSlug(null); setModalType(null); fetchListings(); }} />
       )}
       {modalSlug && modalType === 'features' && (
-        <VehicleFeaturesManager slug={modalSlug} onClose={() => { setModalSlug(null); setModalType(null); fetchListings(); }} />
+        <VehicleFeaturesManager slug={modalSlug} vehicleType={form.vehicleType || 'CARS'} onClose={() => { setModalSlug(null); setModalType(null); fetchListings(); }} />
       )}
       {modalSlug && modalType === 'docs' && (
         <VehicleDocumentsManager slug={modalSlug} onClose={() => { setModalSlug(null); setModalType(null); fetchListings(); }} />

@@ -67,6 +67,8 @@ export function mapVehicleToCarCard(v) {
   return {
     id: v.slug,
     slug: v.slug,
+    category: 'vehicles',
+    wishlistCategory: 'vehicles',
     vehicleId: v.id,
     sellerId,
     sellerName,
@@ -178,6 +180,8 @@ export function mapElectronicsToCard(e) {
   return {
     id: e.slug,
     slug: e.slug,
+    category: 'electronics',
+    wishlistCategory: 'electronics',
     electronicsId: e.id,
     sellerId,
     sellerName,
@@ -220,6 +224,7 @@ export function mapSparePartToCard(s) {
   return {
     id: s.slug,
     slug: s.slug,
+    wishlistCategory: 'spare-parts',
     partId: s.id,
     sellerId,
     sellerName,
@@ -268,6 +273,8 @@ export function mapPropertyToCard(p) {
   return {
     id: p.slug,
     slug: p.slug,
+    category: 'property',
+    wishlistCategory: 'property',
     propertyId: p.id,
     sellerId,
     sellerName,

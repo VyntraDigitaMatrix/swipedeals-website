@@ -101,6 +101,8 @@ export default function CarDetails() {
   const mapped = mapVehicleToCarCard(raw)
   const car = {
     ...mapped,
+    slug: mapped?.slug || raw?.slug || slug,
+    id: mapped?.id || raw?.id || slug,
     images: images.length > 0 && images[0] !== PLACEHOLDER_IMAGE ? images : carImages,
     location: '',
     color: raw.color || mapped.color,

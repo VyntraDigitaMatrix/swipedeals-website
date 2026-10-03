@@ -20,7 +20,7 @@ async function enrichListing(item) {
     if (!Array.isArray(images) || images.length === 0) {
       try {
         const imgRes = await vehicleImageService.getImages(item.slug)
-        const imgList = imgRes?.data?.content ?? imgRes?.content ?? imgRes?.data ?? []
+        const imgList = Array.isArray(imgRes) ? imgRes : (imgRes?.data?.content ?? imgRes?.content ?? imgRes?.data ?? [])
         if (Array.isArray(imgList) && imgList.length > 0) images = imgList
       } catch (e) {}
     }
@@ -29,7 +29,7 @@ async function enrichListing(item) {
     if (!Array.isArray(documents) || documents.length === 0) {
       try {
         const docRes = await vehicleDocumentService.getDocuments(item.slug)
-        const docList = docRes?.data?.content ?? docRes?.content ?? docRes?.data ?? []
+        const docList = Array.isArray(docRes) ? docRes : (docRes?.data?.content ?? docRes?.content ?? docRes?.data ?? [])
         if (Array.isArray(docList) && docList.length > 0) documents = docList
       } catch (e) {}
     }
@@ -38,7 +38,7 @@ async function enrichListing(item) {
     if (!Array.isArray(specifications) || specifications.length === 0) {
       try {
         const specRes = await vehicleSpecificationService.getSpecifications(item.slug)
-        const specList = specRes?.data?.content ?? specRes?.content ?? specRes?.data ?? []
+        const specList = Array.isArray(specRes) ? specRes : (specRes?.data?.content ?? specRes?.content ?? specRes?.data ?? [])
         if (Array.isArray(specList) && specList.length > 0) specifications = specList
       } catch (e) {}
     }
@@ -47,7 +47,7 @@ async function enrichListing(item) {
     if (!Array.isArray(features) || features.length === 0) {
       try {
         const featRes = await vehicleFeatureService.getFeatures(item.slug)
-        const featList = featRes?.data?.content ?? featRes?.content ?? featRes?.data ?? []
+        const featList = Array.isArray(featRes) ? featRes : (featRes?.data?.content ?? featRes?.content ?? featRes?.data ?? [])
         if (Array.isArray(featList) && featList.length > 0) features = featList
       } catch (e) {}
     }

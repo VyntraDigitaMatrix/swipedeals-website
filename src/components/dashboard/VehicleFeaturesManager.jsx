@@ -4,8 +4,8 @@ import Button from '../buttons/Button'
 import { useVehicleFeatures } from '../../hooks/useVehicleFeatures'
 import { FEATURE_CATEGORIES } from '../../services/vehicleListingService'
 
-export default function VehicleFeaturesManager({ slug, onClose }) {
-  const { featureCategories, loading, fetchFeatures, updateFeatures } = useVehicleFeatures(slug)
+export default function VehicleFeaturesManager({ slug, vehicleType, onClose }) {
+  const { featureCategories, loading, fetchFeatures, updateFeatures } = useVehicleFeatures(slug, vehicleType)
   const [localFeatures, setLocalFeatures] = useState([])
   const [saving, setSaving] = useState(false)
 
@@ -34,14 +34,17 @@ export default function VehicleFeaturesManager({ slug, onClose }) {
   const handleSave = async () => {
     setSaving(true)
     try {
+      // Only send features that are checked (available=true).
+      // The backend validates every featureMasterId against the vehicle type,
+      // so including unchecked features from other types causes a 400 error.
       const featuresList = []
       localFeatures.forEach((cat) => {
         if (Array.isArray(cat.features)) {
           cat.features.forEach((feat) => {
-            if (feat.featureMasterId) {
+            if (feat.featureMasterId && feat.available) {
               featuresList.push({
                 featureMasterId: feat.featureMasterId,
-                available: Boolean(feat.available),
+                available: true,
               })
             }
           })
@@ -76,7 +79,8 @@ export default function VehicleFeaturesManager({ slug, onClose }) {
       ) : localFeatures.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border py-12 text-center text-xs text-text-light">
           <Sparkles size={32} className="mx-auto mb-2 text-primary" />
-          No features master catalog loaded for this vehicle yet.
+          <p className="font-semibold text-text-secondary">No feature master catalog found.</p>
+          <p className="mt-1 text-text-light">The feature list is loaded from the admin master catalog. Please check back later.</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -84,7 +88,12 @@ export default function VehicleFeaturesManager({ slug, onClose }) {
             const categoryLabel = FEATURE_CATEGORIES.find((c) => c.value === cat.category)?.label || cat.category
             return (
               <div key={cat.category || catIdx} className="rounded-2xl border border-border bg-surface-alt/40 p-5">
-                <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-primary">{categoryLabel}</h3>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-primary">{categoryLabel}</h3>
+                  <span className="text-[10px] font-mono text-text-secondary">
+                    {cat.features?.filter((f) => f.available).length ?? 0} / {cat.features?.length ?? 0} selected
+                  </span>
+                </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {cat.features?.map((feat, featIdx) => (
                     <label

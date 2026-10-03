@@ -35,7 +35,7 @@ export default function StatCard({ label, value, change, icon: Icon, index = 0, 
         )}
       </div>
       <p className="mt-4 font-mono text-3xl font-extrabold tabular-nums tracking-tight text-text">
-        {String(value).padStart(2, '0')}
+        {value}
       </p>
       <p className="mt-1 text-xs font-medium text-text-secondary">{label}</p>
     </motion.div>

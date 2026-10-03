@@ -11,18 +11,22 @@ export default function VehicleSpecsManager({ slug, onClose }) {
   const [category, setCategory] = useState('ENGINE_AND_TRANSMISSION')
   const [specKey, setSpecKey] = useState('')
   const [specValue, setSpecValue] = useState('')
+  const [displayOrder, setDisplayOrder] = useState(1)
   const [adding, setAdding] = useState(false)
 
   useEffect(() => {
-    if (slug) {
-      fetchSpecifications()
-    }
+    if (slug) fetchSpecifications()
   }, [slug, fetchSpecifications])
+
+  // Auto-increment displayOrder as new specs are added
+  useEffect(() => {
+    setDisplayOrder(specifications.length + 1)
+  }, [specifications.length])
 
   const handleAdd = async (e) => {
     e.preventDefault()
     if (!specKey.trim() || !specValue.trim()) {
-      alert('Please enter both key and value for the specification.')
+      alert('Please enter both Spec Key and Spec Value.')
       return
     }
     setAdding(true)
@@ -31,7 +35,7 @@ export default function VehicleSpecsManager({ slug, onClose }) {
         category,
         specKey: specKey.trim(),
         specValue: specValue.trim(),
-        displayOrder: specifications.length + 1,
+        displayOrder,
       })
       setSpecKey('')
       setSpecValue('')
@@ -52,11 +56,13 @@ export default function VehicleSpecsManager({ slug, onClose }) {
   }
 
   const content = (
-    <div className={onClose ? "max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-surface p-6 shadow-xl sm:p-8" : "w-full space-y-6"}>
+    <div className={onClose ? 'max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-border bg-surface p-6 shadow-xl sm:p-8' : 'w-full space-y-6'}>
       <div className="flex items-center justify-between border-b border-border pb-4">
         <div>
           <h2 className="text-xl font-bold text-text">Technical Specifications</h2>
-          <p className="mt-1 text-xs text-text-secondary">Add technical details such as Engine Displacement, Max Torque, Seating Capacity, etc.</p>
+          <p className="mt-1 text-xs text-text-secondary">
+            Add technical details such as Engine Displacement, Max Torque, Seating Capacity, etc.
+          </p>
         </div>
         {onClose && (
           <button type="button" onClick={onClose} className="rounded-lg p-1 text-text-secondary hover:bg-surface-alt">
@@ -65,37 +71,72 @@ export default function VehicleSpecsManager({ slug, onClose }) {
         )}
       </div>
 
-      {/* Add Spec Form */}
+      {/* Add Spec Form — all 4 API fields from CreateVehicleSpecificationRequest */}
       <form onSubmit={handleAdd} className="rounded-2xl border border-border bg-surface-alt/60 p-5">
-        <h3 className="mb-3 text-sm font-bold text-text">Add New Specification</h3>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <h3 className="mb-1 text-sm font-bold text-text">Add New Specification</h3>
+        <p className="mb-4 text-[11px] text-text-secondary">
+          All 4 API fields:{' '}
+          <code className="rounded bg-border/40 px-1 font-mono text-[10px]">category</code>
+          {' · '}
+          <code className="rounded bg-border/40 px-1 font-mono text-[10px]">specKey</code> (max 100 chars)
+          {' · '}
+          <code className="rounded bg-border/40 px-1 font-mono text-[10px]">specValue</code> (max 255 chars)
+          {' · '}
+          <code className="rounded bg-border/40 px-1 font-mono text-[10px]">displayOrder</code> (int32)
+        </p>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* category — enum: DIMENSIONS_AND_CAPACITY | ENGINE_AND_TRANSMISSION | FUEL_AND_PERFORMANCE | SUSPENSION_STEERING_AND_BRAKES | OTHER */}
           <Dropdown
             label="Category"
             value={category}
             onChange={(v) => setCategory(v)}
             options={SPEC_CATEGORIES}
           />
+
+          {/* displayOrder — int32 */}
           <Input
-            label="Spec Key (e.g. Displacement)"
+            label="Display Order"
+            placeholder="e.g. 1"
+            type="number"
+            min={1}
+            value={displayOrder}
+            onChange={(e) => setDisplayOrder(Number(e.target.value))}
+          />
+
+          {/* specKey — string [0, 100] */}
+          <Input
+            label="Spec Key"
             placeholder="e.g. Engine Displacement"
             value={specKey}
             onChange={(e) => setSpecKey(e.target.value)}
+            maxLength={100}
           />
+
+          {/* specValue — string [0, 255] */}
           <Input
-            label="Spec Value (e.g. 1497 cc)"
+            label="Spec Value"
             placeholder="e.g. 1497 cc"
             value={specValue}
             onChange={(e) => setSpecValue(e.target.value)}
+            maxLength={255}
           />
         </div>
+
         <div className="mt-4 flex justify-end">
-          <Button variant="primary" size="sm" icon={Plus} disabled={adding || !specKey || !specValue} type="submit">
+          <Button
+            variant="primary"
+            size="sm"
+            icon={Plus}
+            disabled={adding || !specKey.trim() || !specValue.trim()}
+            type="submit"
+          >
             {adding ? 'Adding...' : 'Add Specification'}
           </Button>
         </div>
       </form>
 
-      {/* List of Specifications */}
+      {/* Current specifications list */}
       <div>
         <h3 className="mb-3 text-sm font-bold text-text">Current Specifications ({specifications.length})</h3>
         {loading ? (
@@ -111,15 +152,18 @@ export default function VehicleSpecsManager({ slug, onClose }) {
               const categoryLabel = SPEC_CATEGORIES.find((c) => c.value === spec.category)?.label || spec.category
               return (
                 <div key={spec.id} className="flex items-center justify-between p-4 hover:bg-surface-alt/50">
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-primary">{categoryLabel}</span>
-                    <p className="text-sm font-bold text-text">{spec.specKey}</p>
-                    <p className="text-xs text-text-secondary">{spec.specValue}</p>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-primary">{categoryLabel}</span>
+                      <span className="text-[10px] text-text-light">· Order: {spec.displayOrder ?? '—'}</span>
+                    </div>
+                    <p className="truncate text-sm font-bold text-text">{spec.specKey}</p>
+                    <p className="truncate text-xs text-text-secondary">{spec.specValue}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => handleDelete(spec.id)}
-                    className="rounded-lg p-2 text-danger hover:bg-danger/10"
+                    className="ml-3 rounded-lg p-2 text-danger hover:bg-danger/10"
                     title="Delete Specification"
                   >
                     <Trash2 size={16} />
@@ -133,9 +177,7 @@ export default function VehicleSpecsManager({ slug, onClose }) {
 
       {onClose && (
         <div className="mt-8 flex justify-end border-t border-border pt-4">
-          <Button variant="primary" onClick={onClose}>
-            Done
-          </Button>
+          <Button variant="primary" onClick={onClose}>Done</Button>
         </div>
       )}
     </div>

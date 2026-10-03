@@ -12,6 +12,15 @@ export const userProfileService = {
     const response = await api.get('/api/user/profile')
     return response.data
   },
+
+  /**
+   * GET /api/user/dashboard
+   * Returns: { totalProducts, totalAvailableProducts, totalArchivedProducts, totalLeads, ... }
+   */
+  getDashboardStats: async () => {
+    const response = await api.get('/api/user/dashboard')
+    return response.data
+  },
 }
 
 export default userProfileService

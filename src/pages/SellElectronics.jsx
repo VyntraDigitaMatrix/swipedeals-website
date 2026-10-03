@@ -412,7 +412,7 @@ export default function SellElectronics() {
       {/* MODE 1: CREATE ELECTRONICS FORM */}
       {viewMode === 'create' && (
         <div>
-          <div className="mb-6 flex flex-wrap gap-1 border-b border-border">
+          <div className="mb-6 flex flex-wrap gap-4 border-b border-border">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
@@ -446,7 +446,7 @@ export default function SellElectronics() {
             ))}
           </div>
 
-          <div className="mx-auto max-w-2xl rounded-2xl border border-border bg-surface p-6 shadow-soft sm:p-8">
+          <div className="mx-auto max-w-full rounded-2xl border border-border bg-surface p-6 shadow-soft sm:p-8">
             {activeTab === 'details' && (
               <div className="space-y-5">
                 <div className="flex items-center justify-between">

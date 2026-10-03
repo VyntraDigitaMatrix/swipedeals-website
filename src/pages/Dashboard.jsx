@@ -3,7 +3,7 @@ import {
   Archive, Building2, Clock, Eye, FileCheck, Heart, ImagePlus, Laptop, LayoutDashboard, MessageCircle, PackageSearch,
   Pencil, RefreshCw, Rocket, ShieldCheck, ShoppingBag, Sliders, Sparkles, Star, Tags, Trash2, User as UserIcon, Wrench, X, XCircle,
 } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import Breadcrumb from '../components/common/Breadcrumb'
 import Button from '../components/buttons/Button'
 import Badge from '../components/common/Badge'
@@ -23,6 +23,7 @@ import Input from '../components/forms/Input'
 import Dropdown from '../components/forms/Dropdown'
 import TextArea from '../components/forms/TextArea'
 import { useAuth } from '../hooks/useAuth'
+import { userProfileService } from '../services/userProfileService'
 import { useWishlist } from '../hooks/useWishlist'
 import { useListingsStore } from '../hooks/useListingsStore'
 import { useVehicleListings } from '../hooks/useVehicleListings'
@@ -112,7 +113,22 @@ function SectionHeading({ eyebrow, title, count }) {
 }
 
 export default function Dashboard() {
-  const [tab, setTab] = useState('overview')
+  const { tab: urlTab } = useParams()
+  const navigate = useNavigate()
+  const [tab, setTabState] = useState(urlTab || 'overview')
+
+  // Sync local tab state when URL changes (browser back/forward)
+  useEffect(() => {
+    setTabState(urlTab || 'overview')
+  }, [urlTab])
+
+  const setTab = (newTab) => {
+    if (newTab === 'overview') {
+      navigate('/dashboard', { replace: true })
+    } else {
+      navigate(`/dashboard/${newTab}`, { replace: true })
+    }
+  }
   const { user } = useAuth()
   const { wishlist, removeFromWishlist } = useWishlist()
   const { getByPhone } = useListingsStore()
@@ -175,6 +191,7 @@ export default function Dashboard() {
   const [managingVehicleSpecsSlug, setManagingVehicleSpecsSlug] = useState(null)
   const [dashboardChatOpen, setDashboardChatOpen] = useState(false)
   const [chatRecipient, setChatRecipient] = useState(null)
+  const [dashboardStats, setDashboardStats] = useState(null)
 
   const handleSubmitVehicle = async (slug) => {
     if (!window.confirm('Submit this vehicle listing for approval?')) return
@@ -200,6 +217,13 @@ export default function Dashboard() {
     fetchPropertyListings().catch(() => { })
     fetchElectronicsListings().catch(() => { })
     fetchSparePartsListings().catch(() => { })
+    
+    // Fetch dashboard stats from backend
+    userProfileService.getDashboardStats()
+      .then((res) => {
+        if (res?.data) setDashboardStats(res.data)
+      })
+      .catch((err) => console.error('Failed to fetch dashboard stats:', err))
   }, [fetchListings, fetchArchivedListings, fetchPropertyListings, fetchElectronicsListings, fetchSparePartsListings])
 
   const savedItems = findItemsByIds(wishlist).map((item) => ({ ...item, categoryLabel: CATEGORY_LABELS[item.category] }))
@@ -213,10 +237,22 @@ export default function Dashboard() {
   const archivedSpareParts = sparePartsListings.filter((s) => s.status === 'ARCHIVED')
   const totalArchivedCount = archivedVehicleListings.length + archivedProperties.length + archivedElectronics.length + archivedSpareParts.length
 
+  // Pending approval across all listing types
+  const pendingVehicles = apiListings.filter((l) => l.status === 'PENDING_APPROVAL' || l.status === 'pending').length
+  const pendingProperties = propertyListings.filter((l) => l.status === 'PENDING_APPROVAL' || l.status === 'pending').length
+  const pendingElectronics = electronicsListings.filter((l) => l.status === 'PENDING_APPROVAL' || l.status === 'pending').length
+  const pendingSpareParts = sparePartsListings.filter((l) => l.status === 'PENDING_APPROVAL' || l.status === 'pending').length
+  const pendingApprovalCount = pendingVehicles + pendingProperties + pendingElectronics + pendingSpareParts
+
+  // Use dashboard API stats if available, otherwise fallback to local calculation
+  const displayTotalListings = dashboardStats?.totalProducts ?? combinedListingsCount
+  const displayTotalLeads = dashboardStats?.totalLeads ?? 0
+  const displayTotalArchived = dashboardStats?.totalArchivedProducts ?? totalArchivedCount
+
   const TABS = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, count: null },
-    { id: 'listings', label: 'My Listings', icon: Tags, count: combinedListingsCount },
-    { id: 'archived', label: 'Archived Listings', icon: Archive, count: totalArchivedCount },
+    { id: 'listings', label: 'My Listings', icon: Tags, count: displayTotalListings },
+    { id: 'archived', label: 'Archived Listings', icon: Archive, count: displayTotalArchived },
     { id: 'properties', label: 'My Properties', icon: Building2, count: propertyListings.length },
     { id: 'electronics', label: 'My Electronics', icon: Laptop, count: electronicsListings.length },
     { id: 'spare-parts', label: 'My Spare Parts', icon: Wrench, count: sparePartsListings.length },
@@ -405,10 +441,34 @@ export default function Dashboard() {
       {tab === 'overview' && (
         <div className="space-y-10">
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="Saved Listings" value={savedItems.length} icon={Heart} index={0} accent="primary" />
-            <StatCard label="Orders Placed" value={userOrders.length} icon={ShoppingBag} index={1} accent="success" />
-            <StatCard label="Inquiries Sent" value={userInquiries.length} icon={PackageSearch} index={2} accent="warning" />
-            <StatCard label="Unread Messages" value={unreadCount} icon={MessageCircle} index={3} accent="danger" />
+            <StatCard
+              label="Total Listings"
+              value={displayTotalListings}
+              icon={Tags}
+              index={0}
+              accent="primary"
+            />
+            <StatCard
+              label="Total Leads"
+              value={displayTotalLeads}
+              icon={PackageSearch}
+              index={1}
+              accent="success"
+            />
+            <StatCard
+              label="Pending Approval"
+              value={pendingApprovalCount}
+              icon={Clock}
+              index={2}
+              accent="warning"
+            />
+            <StatCard
+              label="Archived Listings"
+              value={displayTotalArchived}
+              icon={Archive}
+              index={3}
+              accent="danger"
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -429,20 +489,21 @@ export default function Dashboard() {
                           <img src={vehicleImage} alt="" className="h-full w-full object-cover" />
                           <span className="absolute left-1.5 top-1.5 h-1.5 w-1.5 rounded-full bg-primary" />
                         </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="line-clamp-1 text-sm font-bold text-text">{titleCaseEnum(v.brand)} {v.model} {v.variant}</p>
-                          <Badge variant={LISTING_STATUS_VARIANT[v.status] || 'neutral'}>
-                            {LISTING_STATUS_LABEL[v.status] || v.status}
-                          </Badge>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="line-clamp-1 text-sm font-bold text-text">{titleCaseEnum(v.brand)} {v.model} {v.variant}</p>
+                            <Badge variant={LISTING_STATUS_VARIANT[v.status] || 'neutral'}>
+                              {LISTING_STATUS_LABEL[v.status] || v.status}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 font-mono text-xs font-semibold text-text-secondary">
+                            {v.year} · {titleCaseEnum(v.fuelType)} · Reg: {v.registrationNumber || 'N/A'}
+                          </p>
+                          <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(v.price)}</p>
                         </div>
-                        <p className="mt-1 font-mono text-xs font-semibold text-text-secondary">
-                          {v.year} · {titleCaseEnum(v.fuelType)} · Reg: {v.registrationNumber || 'N/A'}
-                        </p>
-                        <p className="mt-1 font-mono text-sm font-extrabold text-text">{formatCurrencyFull(v.price)}</p>
                       </div>
-                    </div>
-                  )})}
+                    )
+                  })}
                 </div>
               ) : (
                 <div className="rounded-2xl border border-border bg-surface p-6 text-center shadow-soft">
@@ -582,7 +643,7 @@ export default function Dashboard() {
                           size="xs"
                           variant="outline"
                           icon={Sparkles}
-                          onClick={() => setManagingVehicleFeaturesSlug(v.slug)}
+                          onClick={() => setManagingVehicleFeaturesSlug({ slug: v.slug, vehicleType: v.vehicleType })}
                         >
                           Features
                         </Button>
@@ -1817,7 +1878,8 @@ export default function Dashboard() {
       {/* Vehicle Features Manager Modal */}
       {managingVehicleFeaturesSlug && (
         <VehicleFeaturesManager
-          slug={managingVehicleFeaturesSlug}
+          slug={managingVehicleFeaturesSlug?.slug}
+          vehicleType={managingVehicleFeaturesSlug?.vehicleType}
           onClose={() => {
             setManagingVehicleFeaturesSlug(null)
             fetchListings()
