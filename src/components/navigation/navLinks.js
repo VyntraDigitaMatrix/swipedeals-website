@@ -49,8 +49,9 @@ export const navLinks = [
         label: 'Services',
         to: '/vehicle-info',
         dropdown: [
+          { label: 'RC Status', description: 'Instant vehicle RC status & ownership details', to: '/rc-status' },
           { label: 'Challan Payment', description: 'Check & pay traffic challans instantly', to: '/challan-payment' },
-          { label: 'RC / Vehicle Details', description: 'Look up any vehicle by registration number', to: '/vehicle-info' },
+          { label: 'RC / Vehicle Details', description: 'Look up any vehicle by registration number', to: '/rc-status' },
           { label: 'Car Finance', description: 'Compare loan offers & calculate EMI', to: '/finance' },
           { label: 'Car Insurance', description: 'Compare plans & get an instant quote', to: '/insurance' },
         ]

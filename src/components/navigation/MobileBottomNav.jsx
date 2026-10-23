@@ -15,6 +15,7 @@ const NAV_ITEMS = [
 const MORE_ITEMS = [
   { label: 'Commercial', to: '/commercial-vehicles' },
   { label: 'Challan Check', to: '/challan-payment' },
+  { label: 'RC Status', to: '/rc-status' },
   { label: 'Finance', to: '/finance' },
   { label: 'Insurance', to: '/insurance' },
   { label: 'Compare', to: '/compare' },
@@ -36,14 +37,14 @@ export default function MobileBottomNav() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMoreOpen(false)}
-              className="fixed inset-0 z-[55] bg-black/40 backdrop-blur-sm xl:hidden"
+              className="fixed inset-0 z-[55] bg-black/40 backdrop-blur-sm lg:hidden"
             />
             <motion.div
               initial={{ y: '100%', opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: '100%', opacity: 0 }}
               transition={{ type: 'spring', stiffness: 350, damping: 32 }}
-              className="fixed bottom-[64px] left-0 right-0 z-[60] mx-auto max-w-sm rounded-t-3xl border border-border bg-surface shadow-2xl p-4 xl:hidden"
+              className="fixed bottom-[64px] left-0 right-0 z-[60] mx-auto max-w-sm rounded-t-3xl border border-border bg-surface shadow-2xl p-4 lg:hidden"
             >
               <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border" />
               <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-text-secondary px-1">More Categories</p>
@@ -69,7 +70,7 @@ export default function MobileBottomNav() {
 
       {/* Bottom Nav Bar */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 flex h-16 items-center border-t border-border bg-surface/95 backdrop-blur-xl shadow-[0_-4px_24px_rgba(0,0,0,0.08)] xl:hidden"
+        className="fixed bottom-0 left-0 right-0 z-50 flex h-16 items-center border-t border-border bg-surface/95 backdrop-blur-xl shadow-[0_-4px_24px_rgba(0,0,0,0.08)] lg:hidden"
         aria-label="Mobile bottom navigation"
       >
         {NAV_ITEMS.map((item) => (

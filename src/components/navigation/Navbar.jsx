@@ -5,23 +5,30 @@ import {
   AlertTriangle,
   ArrowRight,
   BadgeCheck,
+  Bell,
   CarFront,
   Check,
   ChevronDown,
   CreditCard,
+  FileSearch,
   FileText,
+  Gavel,
   Heart,
   Home,
   Laptop,
   LayoutDashboard,
+  LayoutGrid,
   LogOut,
   MapPin,
   Menu,
+  MessageSquare,
   Plus,
   PlusCircle,
+  Receipt,
   Search,
   ShieldCheck,
   ShoppingBag,
+  Smartphone,
   Sparkles,
   Settings,
   Truck,
@@ -31,10 +38,12 @@ import {
 } from 'lucide-react'
 import { useScrollPosition } from '../../hooks/useScrollPosition'
 import { useWishlist } from '../../hooks/useWishlist'
+import { useNotifications } from '../../hooks/useNotifications'
 import { useAuth } from '../../hooks/useAuth'
 import { useKyc } from '../../hooks/useKyc'
 import { useUserProfile } from '../../hooks/useUserProfile'
 import { useOnClickOutside } from '../../hooks/useOnClickOutside'
+import NotificationDropdown from '../notifications/NotificationDropdown'
 import navLinks from './navLinks'
 import { cn } from '../../utils/cn'
 
@@ -55,7 +64,8 @@ const ITEM_ICONS = {
   'Buy Properties': Home,
   'Sell Property': PlusCircle,
   'Challan Payment': FileText,
-  'RC / Vehicle Details': ShieldCheck,
+  'RC / Vehicle Details': FileSearch,
+  'RC Status': FileSearch,
   'Car Finance': CreditCard,
   'Car Insurance': ShieldCheck,
   'Electronics': Laptop,
@@ -85,11 +95,14 @@ const DROPDOWN_PROMOS = {
 
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [selectedCity, setSelectedCity] = useState('Mumbai')
+  const [selectedCity, setSelectedCity] = useState('Hyderabad')
   const [locationOpen, setLocationOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   const locationRef = useRef(null)
+  const moreRef = useRef(null)
 
   useOnClickOutside(locationRef, () => setLocationOpen(false))
+  useOnClickOutside(moreRef, () => setMoreOpen(false))
 
   const navigate = useNavigate()
   const scrolled = useScrollPosition(20)
@@ -105,50 +118,53 @@ export default function Navbar() {
   return (
     <header
       className={cn(
-        'sticky top-0 z-50 border-b border-border bg-surface transition-all duration-300',
-        scrolled ? 'shadow-card bg-surface py-0' : 'py-0'
+        'sticky top-0 z-50 border-b border-[#ECEEF2] bg-white transition-all duration-300',
+        scrolled ? 'shadow-sm' : ''
       )}
     >
-      <div className="container-page flex h-16 items-center justify-between gap-4">
+      {/* Top Tier */}
+      <div className="container-page flex items-center justify-between gap-3 lg:gap-6 py-2.5 sm:py-3">
         {/* Brand Logo & Location Selector */}
-        <div className="flex items-center gap-3 md:gap-4">
-          <Link to="/" className="flex shrink-0 items-center gap-2.5 group select-none" aria-label="SwipeDeals home">
-            <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary via-primary-light to-secondary text-white shadow-lift transition-transform group-hover:scale-105">
-              <CarFront size={22} className="text-white drop-shadow" />
-              <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-black text-white ring-2 ring-surface">
-                ✓
-              </span>
+        <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+          <Link to="/" className="flex items-center gap-2 sm:gap-2.5 shrink-0 select-none" aria-label="SwipeDeals home">
+            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-[#E8182F] text-white shadow-sm font-black text-xl italic tracking-tighter">
+              S
             </div>
-            <div className="flex flex-col">
-              <span className="text-xl font-black tracking-tight text-text leading-none">
-                Swipe<span className="text-primary font-black">Deals</span>
+            <div className="flex flex-col leading-tight">
+              <span className="text-[17px] sm:text-[20px]" style={{ fontFamily: 'Inter', fontWeight: 700, fontStyle: 'Regular', fontStyle: 'Bold', color: '#0F172A' }}>
+                Swipe<span className="text-[#E11D27]">Deals</span>
               </span>
-              <span className="text-[10px] font-bold tracking-wider text-text-secondary uppercase">
-                Cars & Verified Marketplace
+              <span className="text-[10px] sm:text-[11px]" style={{ fontFamily: 'Inter', fontWeight: 400, fontStyle: 'Regular', color: '#64748B' }}>
+                Buy · Sell · Anything
               </span>
             </div>
           </Link>
 
           {/* Location Selector Button on Navbar */}
-          <div ref={locationRef} className="relative hidden sm:block select-none">
+          <div ref={locationRef} className="relative hidden md:block select-none">
             <button
               type="button"
               onClick={() => setLocationOpen((prev) => !prev)}
-              className="flex items-center gap-1.5 rounded-xl border border-border bg-surface-alt/90 px-3 py-1.5 text-xs text-text hover:bg-surface hover:border-primary/40 transition-all shadow-2xs"
+              className="flex items-center gap-1.5 rounded-xl border border-[#E5E7EB] bg-white px-3 py-3 text-xs font-semibold text-[#0F172A] hover:border-[#CF1430] hover:bg-gray-50/50 transition cursor-pointer shadow-2xs"
               aria-haspopup="true"
               aria-expanded={locationOpen}
             >
-              <MapPin size={14} className="text-primary shrink-0" aria-hidden="true" />
-              <span className="font-bold text-text">{selectedCity}</span>
-              <ChevronDown size={12} className={`text-text-secondary transition-transform ${locationOpen ? 'rotate-180 text-primary' : ''}`} aria-hidden="true" />
+              <MapPin size={15} className="text-[#3E4654] shrink-0" aria-hidden="true" />
+              <span>{selectedCity}</span>
+              <ChevronDown
+                size={14}
+                className={`text-[#5B6474] transition-transform duration-200 ${locationOpen ? 'rotate-180 text-[#E11D27]' : ''
+                  }`}
+                aria-hidden="true"
+              />
             </button>
 
             {locationOpen && (
-              <div className="absolute left-0 top-full z-[60] mt-2 w-48 rounded-2xl border border-border bg-surface p-2 shadow-2xl backdrop-blur-xl">
-                <div className="px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-text-secondary border-b border-border/60 mb-1">
-                  Select Your City
+              <div className="absolute left-0 top-full z-[60] mt-1.5 w-48 rounded-xl border border-[#ECEEF2] bg-white p-1.5 shadow-xl">
+                <div className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#8A92A0]">
+                  Select City
                 </div>
-                <div className="space-y-0.5 max-h-60 overflow-y-auto no-scrollbar">
+                <div className="space-y-0.5 max-h-56 overflow-y-auto no-scrollbar">
                   {CITIES.map((city) => (
                     <button
                       key={city}
@@ -157,13 +173,13 @@ export default function Navbar() {
                         setSelectedCity(city)
                         setLocationOpen(false)
                       }}
-                      className={`flex w-full items-center justify-between rounded-xl px-2.5 py-2 text-xs text-left transition-colors ${selectedCity === city
-                          ? 'bg-primary/10 font-bold text-primary'
-                          : 'text-text hover:bg-surface-alt font-medium'
+                      className={`flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-xs text-left transition cursor-pointer ${selectedCity === city
+                        ? 'bg-[#FDECEE] font-bold text-[#D4111F]'
+                        : 'text-[#1F2633] hover:bg-gray-100 font-medium'
                         }`}
                     >
                       <span>{city}</span>
-                      {selectedCity === city && <Check size={13} className="text-primary" />}
+                      {selectedCity === city && <Check size={13} className="text-[#D4111F]" />}
                     </button>
                   ))}
                 </div>
@@ -172,37 +188,142 @@ export default function Navbar() {
           </div>
         </div>
 
-        {/* Primary Desktop Navigation Links */}
-        <nav className="hidden items-center gap-1 xl:flex" aria-label="Primary">
-          {navLinks.map((link) =>
-            link.dropdown ? (
-              <NavDropdown key={link.label} link={link} />
-            ) : (
-              <NavLink
-                key={link.to}
-                to={link.to}
-                className={({ isActive }) =>
-                  cn(
-                    'relative rounded-lg px-3 py-2 text-sm font-semibold transition-all',
-                    isActive
-                      ? 'text-primary font-bold bg-primary/10'
-                      : 'text-text-secondary hover:bg-surface-alt hover:text-text'
-                  )
-                }
-                end={link.to === '/'}
-              >
-                {link.label}
-              </NavLink>
-            )
-          )}
-        </nav>
+        {/* Center: Search Bar with Red Action Button */}
+        <form
+          onSubmit={handleSearch}
+          className="flex-1 max-w-[540px] xl:max-w-[620px] 2xl:max-w-[700px] flex items-center min-w-0"
+        >
+          <div className="relative flex-1 flex items-center h-10 sm:h-10.5 rounded-xl border border-[#E2E5EB] bg-white overflow-hidden focus-within:border-[#CF1430] focus-within:ring-1 focus-within:ring-[#CF1430] transition shadow-2xs">
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search for cars, properties, electronics..."
+              className="w-full h-full pl-3.5 pr-2 text-xs sm:text-[13px] text-[#0B1B2E] placeholder:text-[#8A92A0] bg-transparent outline-none"
+            />
+            <button
+              type="submit"
+              className="h-full px-4 sm:px-4.5 bg-[#E11D27] hover:bg-[#D4111F] text-white flex items-center justify-center transition shrink-0 cursor-pointer"
+              aria-label="Search"
+            >
+              <Search size={17} strokeWidth={2.4} />
+            </button>
+          </div>
+        </form>
 
-        {/* Actions & User Controls */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        {/* Right Side: Wishlist, Auctions, More, Chats, Login/UserMenu, Sell */}
+        <div className="flex items-center gap-2 sm:gap-3.5 lg:gap-6 shrink-0">
           {/* Wishlist Button */}
-          <IconLink to="/wishlist" label="Wishlist" badge={count}>
-            <Heart size={19} aria-hidden="true" />
-          </IconLink>
+          <Link
+            to="/wishlist"
+            className="flex flex-col items-center justify-center text-[#334155] hover:text-[#E11D27] transition group"
+            aria-label="Wishlist"
+          >
+            <div className="relative">
+              <Heart size={20} className="group-hover:scale-105 transition-transform" />
+              {count > 0 && (
+                <span className="absolute -top-1 -right-2 h-3.5 min-w-3.5 px-0.5 rounded-full bg-[#E11D27] text-[9px] font-bold text-white flex items-center justify-center">
+                  {count}
+                </span>
+              )}
+            </div>
+            <span className="text-[11px] font-medium text-[#334155] group-hover:text-[#E11D27] mt-0.5">
+              Wishlist
+            </span>
+          </Link>
+
+          {/* Auctions */}
+          <Link
+            to="/auctions"
+            className="hidden sm:flex flex-col items-center justify-center text-[#334155] hover:text-[#E11D27] transition group"
+            aria-label="Auctions"
+          >
+            <div className="relative">
+              <Gavel size={20} className="group-hover:scale-105 transition-transform" />
+            </div>
+            <span className="text-[11px] font-medium text-[#334155] group-hover:text-[#E11D27] mt-0.5">
+              Auctions
+            </span>
+          </Link>
+
+          {/* More Dropdown */}
+          <div ref={moreRef} className="relative hidden sm:block">
+            <button
+              type="button"
+              onClick={() => setMoreOpen((v) => !v)}
+              className={`flex flex-col items-center justify-center transition cursor-pointer ${moreOpen ? 'text-[#E11D27]' : 'text-[#E11D27] hover:text-[#E11D27]'}`}
+            >
+              <div className="flex items-center gap-0.5">
+                <LayoutGrid size={18} strokeWidth={2.2} />
+                <ChevronDown size={12} className={`transition-transform duration-200 ${moreOpen ? 'rotate-180' : ''}`} />
+              </div>
+              <span className="text-[11px] font-medium text-[#E11D27] group-hover:text-[#E11D27] mt-0.5">More</span>
+            </button>
+
+            {moreOpen && (
+              <div className="absolute right-0 top-full z-[60] mt-2 w-64 rounded-2xl border border-[#ECEEF2] bg-white p-2 shadow-2xl">
+                {/* SwipeAuctions */}
+                <Link
+                  to="/auctions"
+                  onClick={() => setMoreOpen(false)}
+                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-[#FDF5F5] transition group"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FEE9EA]">
+                    <Gavel size={18} className="text-[#D4111F]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-[#0B1B2E]">SwipeAuctions</span>
+                      <span className="inline-flex items-center rounded-full bg-[#E8182F] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">SOON</span>
+                    </div>
+                    <p className="text-[11px] text-[#6B7280] mt-0.5">Bid on cars &amp; bikes</p>
+                  </div>
+                </Link>
+
+                {/* Challan */}
+                <Link
+                  to="/challan-payment"
+                  onClick={() => setMoreOpen(false)}
+                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-[#FDF5F5] transition group mt-1"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FEE9EA]">
+                    <Receipt size={18} className="text-[#D4111F]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-bold text-[#0B1B2E]">Challan</span>
+                    <p className="text-[11px] text-[#6B7280] mt-0.5">Check &amp; pay traffic challans</p>
+                  </div>
+                </Link>
+
+                {/* RC Status */}
+                <Link
+                  to="/rc-status"
+                  onClick={() => setMoreOpen(false)}
+                  className="flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-[#FDF5F5] transition group mt-1"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#FEE9EA]">
+                    <FileSearch size={18} className="text-[#D4111F]" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-bold text-[#0B1B2E]">RC Status</span>
+                    <p className="text-[11px] text-[#6B7280] mt-0.5">Check vehicle RC &amp; ownership</p>
+                  </div>
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Chats */}
+          <Link
+            to="/dashboard"
+            className="hidden sm:flex flex-col items-center justify-center text-[#3E4654] hover:text-[#E8182F] transition group"
+            aria-label="Chats"
+          >
+            <MessageSquare size={19} className="group-hover:scale-105 transition-transform" />
+            <span className="text-[11px] font-medium text-[#334155] group-hover:text-[#E11D27] mt-0.5">
+              Chats
+            </span>
+          </Link>
 
           {/* User Account / Login */}
           {isAuthenticated ? (
@@ -210,23 +331,72 @@ export default function Navbar() {
           ) : (
             <Link
               to="/login"
-              className="flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-primary-dark transition-colors"
+              className="flex flex-col items-center justify-center text-[#3E4654] hover:text-[#E8182F] transition group"
+              aria-label="Login"
             >
-              <User size={14} aria-hidden="true" />
-              <span>Login</span>
+              <User size={19} className="group-hover:scale-105 transition-transform" />
+              <span className="text-[11px] font-medium text-[#4B5563] group-hover:text-[#E8182F] mt-0.5">
+                Login
+              </span>
             </Link>
           )}
+
+          {/* Sell Button */}
+          <Link
+            to="/sell"
+            className="flex items-center gap-1.5 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-[#E11D27] hover:bg-[#D4111F] text-white text-xs sm:text-[13px] font-bold shadow-sm transition-transform active:scale-98 cursor-pointer shrink-0"
+          >
+            <Plus size={16} strokeWidth={2.5} />
+            <span>Sell</span>
+          </Link>
 
           {/* Mobile Hamburger Toggle */}
           <button
             type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Open menu"
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface-alt text-text transition-colors hover:bg-surface-alt/80 xl:hidden"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-surface-alt text-text transition-colors hover:bg-surface-alt/80 xl:hidden"
           >
-            <Menu size={22} aria-hidden="true" />
+            <Menu size={20} aria-hidden="true" />
           </button>
         </div>
+      </div>
+
+      {/* Bottom Category Row: Cars, Properties, Electronics, Spare Parts, Mobiles */}
+      <div className="container-page border-t border-[#F0F2F5] py-2">
+        <nav
+          className="flex items-center gap-6 sm:gap-10 overflow-x-auto no-scrollbar text-xs sm:text-[13px] font-semibold text-[#1F2633]"
+          aria-label="Category Navigation"
+        >
+          <Link
+            to="/cars"
+            className="flex items-center gap-1.5 text-[#2C3444] hover:text-[#E8182F] transition whitespace-nowrap shrink-0 group"
+          >
+            <CarFront size={15} className="text-[#334155] group-hover:text-[#E8182F] transition-colors" />
+            <span>Cars</span>
+          </Link>
+          <Link
+            to="/properties"
+            className="flex items-center gap-1.5 text-[#2C3444] hover:text-[#E8182F] transition whitespace-nowrap shrink-0 group"
+          >
+            <Home size={15} className="text-[#334155] group-hover:text-[#E8182F] transition-colors" />
+            <span>Properties</span>
+          </Link>
+          <Link
+            to="/electronics"
+            className="flex items-center gap-1.5 text-[#2C3444] hover:text-[#E8182F] transition whitespace-nowrap shrink-0 group"
+          >
+            <Laptop size={15} className="text-[#334155] group-hover:text-[#E8182F] transition-colors" />
+            <span>Electronics</span>
+          </Link>
+          <Link
+            to="/spare-parts"
+            className="flex items-center gap-1.5 text-[#2C3444] hover:text-[#E8182F] transition whitespace-nowrap shrink-0 group"
+          >
+            <Settings size={15} className="text-[#334155] group-hover:text-[#E8182F] transition-colors" />
+            <span>Spare Parts</span>
+          </Link>
+        </nav>
       </div>
 
       <MobileMenu
@@ -426,7 +596,7 @@ function NavSubDropdown({ item, setOpen: setParentOpen }) {
                     }}
                     className="flex items-start gap-3 rounded-xl p-2.5 transition-colors hover:bg-surface-alt group"
                   >
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors mt-0.5">
+                    <div className=" shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white transition-colors mt-0.5">
                       <SubIcon size={14} />
                     </div>
                     <div>
@@ -468,6 +638,7 @@ function UserMenu({ user, onLogout }) {
   const menuItems = [
     { label: 'Profile', to: '/profile', icon: User },
     { label: 'Wishlist', to: '/wishlist', icon: Heart },
+    { label: 'Notifications', to: '/notifications', icon: Bell },
     { label: 'My Dashboard', to: '/dashboard', icon: LayoutDashboard },
     { label: 'My Listings', to: '/dashboard/listings', icon: ShoppingBag },
     { label: isKycVerified ? 'KYC Verified' : 'Complete KYC', to: '/kyc', icon: BadgeCheck },
@@ -488,17 +659,13 @@ function UserMenu({ user, onLogout }) {
         aria-expanded={open}
         aria-label="Account menu"
         className={cn(
-          'flex items-center gap-2 rounded-xl border border-border p-1 pr-2.5 transition-colors',
-          open ? 'bg-primary/10 border-primary/40' : 'bg-surface-alt hover:bg-surface'
+          'flex items-center gap-2 rounded-xl p-1 pr-2.5 transition-colors'
         )}
       >
         {/* Avatar: first letter of the user's name */}
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary-dark text-xs font-bold text-white shadow-lift">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#E11D27] text-xs font-bold text-white shadow-lift">
           {initial}
         </span>
-        {/* Display name — always visible */}
-        <span className="text-xs font-bold text-text truncate max-w-[90px]">{displayName}</span>
-        <ChevronDown size={13} className={cn('text-text-secondary transition-transform', open && 'rotate-180 text-primary')} aria-hidden="true" />
       </button>
 
       <AnimatePresence>
@@ -589,6 +756,8 @@ function IconLink({ to, label, children, badge }) {
 function MobileMenu({ open, onClose, selectedCity, setSelectedCity }) {
   const [openDropdown, setOpenDropdown] = useState('Cars')
   const { user, isAuthenticated, logout } = useAuth()
+  const { count: wishlistCount } = useWishlist()
+  const { unreadCount } = useNotifications()
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
   const [showCityPicker, setShowCityPicker] = useState(false)
@@ -817,6 +986,26 @@ function MobileMenu({ open, onClose, selectedCity, setSelectedCity }) {
 
           {/* Footer CTAs / Account Section */}
           <div className="mt-auto flex flex-col gap-3 pt-4 border-t border-border">
+            {/* Quick user shortcuts */}
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                to="/wishlist"
+                onClick={onClose}
+                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface-alt p-2.5 text-xs font-bold text-text hover:bg-surface transition-colors"
+              >
+                <Heart size={15} className="text-primary" />
+                <span>Wishlist {wishlistCount > 0 && `(${wishlistCount})`}</span>
+              </Link>
+              <Link
+                to="/notifications"
+                onClick={onClose}
+                className="flex items-center justify-center gap-2 rounded-xl border border-border bg-surface-alt p-2.5 text-xs font-bold text-text hover:bg-surface transition-colors"
+              >
+                <Bell size={15} className="text-primary" />
+                <span>Alerts {unreadCount > 0 && `(${unreadCount})`}</span>
+              </Link>
+            </div>
+
             {isAuthenticated ? (
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-3 rounded-2xl border border-border bg-surface-alt p-3">

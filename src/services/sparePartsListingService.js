@@ -88,11 +88,26 @@ export const sparePartsListingService = {
    */
   uploadImages: async (slug, files) => {
     const formData = new FormData()
-    files.forEach((file) => formData.append('files', file))
-    const res = await api.post(`/api/user/products/spare-parts/${encodeURIComponent(slug)}/images`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-    return res.data
+    const fileList = Array.isArray(files) ? files : [files]
+    fileList.forEach((file) => formData.append('files', file))
+    try {
+      const res = await api.post(`/api/user/products/spare-parts/${encodeURIComponent(slug)}/images`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      return res.data
+    } catch (err) {
+      console.warn('Batch spare part upload failed, trying single file fallback:', err)
+      const results = []
+      for (const file of fileList) {
+        const singleFd = new FormData()
+        singleFd.append('file', file)
+        const res = await api.post(`/api/user/products/spare-parts/${encodeURIComponent(slug)}/images`, singleFd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        })
+        results.push(res.data)
+      }
+      return results
+    }
   },
 
   /**
@@ -102,9 +117,13 @@ export const sparePartsListingService = {
   updateImage: async (slug, imageId, file) => {
     const formData = new FormData()
     formData.append('file', file)
-    const res = await api.put(`/api/user/products/spare-parts/${encodeURIComponent(slug)}/images/${imageId}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const res = await api.put(
+      `/api/user/products/spare-parts/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }
+    )
     return res.data
   },
 
@@ -113,7 +132,9 @@ export const sparePartsListingService = {
    * Delete a specific spare part image.
    */
   deleteImage: async (slug, imageId) => {
-    const res = await api.delete(`/api/user/products/spare-parts/${encodeURIComponent(slug)}/images/${imageId}`)
+    const res = await api.delete(
+      `/api/user/products/spare-parts/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}`
+    )
     return res.data
   },
 
@@ -122,7 +143,9 @@ export const sparePartsListingService = {
    * Set an image as primary.
    */
   setPrimaryImage: async (slug, imageId) => {
-    const res = await api.put(`/api/user/products/spare-parts/${encodeURIComponent(slug)}/images/${imageId}/primary`)
+    const res = await api.put(
+      `/api/user/products/spare-parts/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}/primary`
+    )
     return res.data
   },
 
@@ -130,19 +153,30 @@ export const sparePartsListingService = {
    * PUT /api/user/products/spare-parts/{slug}/images/{imageId}/order
    * Update the display order of an image.
    */
-  reorderImage: async (slug, imageId, displayOrder) => {
-    const res = await api.put(`/api/user/products/spare-parts/${encodeURIComponent(slug)}/images/${imageId}/order`, null, {
-      params: { displayOrder }
-    })
+  updateImageOrder: async (slug, imageId, displayOrder) => {
+    const res = await api.put(
+      `/api/user/products/spare-parts/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}/order`,
+      null,
+      {
+        params: { displayOrder: parseInt(displayOrder, 10) },
+      }
+    )
     return res.data
+  },
+
+  /**
+   * Alias for updateImageOrder.
+   */
+  reorderImage: async (slug, imageId, displayOrder) => {
+    return sparePartsListingService.updateImageOrder(slug, imageId, displayOrder)
   },
 
   /**
    * GET /api/user/products/spare-parts/{slug}/images
    * Retrieve all images for a spare part listing.
    */
-  getImages: async (slug) => {
-    const res = await api.get(`/api/user/products/spare-parts/${encodeURIComponent(slug)}/images`)
+  getImages: async (slug, params = {}) => {
+    const res = await api.get(`/api/user/products/spare-parts/${encodeURIComponent(slug)}/images`, { params })
     return res.data
   },
 
@@ -155,5 +189,43 @@ export const sparePartsListingService = {
     return res.data
   },
 }
+
+/**
+ * Service specifically for User Spare Part Images controller endpoints:
+ * (/api/user/products/spare-parts/{slug}/images/**)
+ */
+export const userSparePartImageService = {
+  getImages: async (slug, params = {}) => {
+    const res = await api.get(`/api/user/products/spare-parts/${encodeURIComponent(slug)}/images`, { params })
+    return res.data
+  },
+  getPrimaryImage: async (slug) => {
+    const res = await api.get(`/api/user/products/spare-parts/${encodeURIComponent(slug)}/images/primary`)
+    return res.data
+  },
+  uploadImages: async (slug, files) => {
+    return sparePartsListingService.uploadImages(slug, files)
+  },
+  updateImage: async (slug, imageId, file) => {
+    return sparePartsListingService.updateImage(slug, imageId, file)
+  },
+  deleteImage: async (slug, imageId) => {
+    return sparePartsListingService.deleteImage(slug, imageId)
+  },
+  setPrimaryImage: async (slug, imageId) => {
+    return sparePartsListingService.setPrimaryImage(slug, imageId)
+  },
+  updateImageOrder: async (slug, imageId, displayOrder) => {
+    return sparePartsListingService.updateImageOrder(slug, imageId, displayOrder)
+  },
+  reorderImage: async (slug, imageId, displayOrder) => {
+    return sparePartsListingService.updateImageOrder(slug, imageId, displayOrder)
+  },
+}
+
+/**
+ * Unified Spare Part Image Service wrapper.
+ */
+export const sparePartImageService = userSparePartImageService
 
 export default sparePartsListingService

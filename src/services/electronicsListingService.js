@@ -154,7 +154,8 @@ export const electronicsListingService = {
    */
   uploadImages: async (slug, files) => {
     const formData = new FormData()
-    files.forEach((file) => formData.append('files', file))
+    const fileList = Array.isArray(files) ? files : [files]
+    fileList.forEach((file) => formData.append('files', file))
     try {
       const res = await api.post(`/api/user/products/electronics/${encodeURIComponent(slug)}/images`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -163,7 +164,7 @@ export const electronicsListingService = {
     } catch (err) {
       console.warn('Batch image upload failed, falling back to single file uploads:', err)
       const results = []
-      for (const file of files) {
+      for (const file of fileList) {
         const singleFd = new FormData()
         singleFd.append('file', file)
         const res = await api.post(`/api/user/products/electronics/${encodeURIComponent(slug)}/images`, singleFd, {
@@ -182,9 +183,13 @@ export const electronicsListingService = {
   updateImage: async (slug, imageId, file) => {
     const formData = new FormData()
     formData.append('file', file)
-    const res = await api.put(`/api/user/products/electronics/${encodeURIComponent(slug)}/images/${imageId}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const res = await api.put(
+      `/api/user/products/electronics/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }
+    )
     return res.data
   },
 
@@ -193,7 +198,9 @@ export const electronicsListingService = {
    * Delete a specific electronics image.
    */
   deleteImage: async (slug, imageId) => {
-    const res = await api.delete(`/api/user/products/electronics/${encodeURIComponent(slug)}/images/${imageId}`)
+    const res = await api.delete(
+      `/api/user/products/electronics/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}`
+    )
     return res.data
   },
 
@@ -202,7 +209,9 @@ export const electronicsListingService = {
    * Set an image as primary.
    */
   setPrimaryImage: async (slug, imageId) => {
-    const res = await api.put(`/api/user/products/electronics/${encodeURIComponent(slug)}/images/${imageId}/primary`)
+    const res = await api.put(
+      `/api/user/products/electronics/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}/primary`
+    )
     return res.data
   },
 
@@ -210,19 +219,30 @@ export const electronicsListingService = {
    * PUT /api/user/products/electronics/{slug}/images/{imageId}/order
    * Update the display order of an image.
    */
-  reorderImage: async (slug, imageId, displayOrder) => {
-    const res = await api.put(`/api/user/products/electronics/${encodeURIComponent(slug)}/images/${imageId}/order`, null, {
-      params: { displayOrder },
-    })
+  updateImageOrder: async (slug, imageId, displayOrder) => {
+    const res = await api.put(
+      `/api/user/products/electronics/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}/order`,
+      null,
+      {
+        params: { displayOrder: parseInt(displayOrder, 10) },
+      }
+    )
     return res.data
+  },
+
+  /**
+   * Alias for updateImageOrder.
+   */
+  reorderImage: async (slug, imageId, displayOrder) => {
+    return electronicsListingService.updateImageOrder(slug, imageId, displayOrder)
   },
 
   /**
    * GET /api/user/products/electronics/{slug}/images
    * Retrieve all images for an electronics listing.
    */
-  getImages: async (slug) => {
-    const res = await api.get(`/api/user/products/electronics/${encodeURIComponent(slug)}/images`)
+  getImages: async (slug, params = {}) => {
+    const res = await api.get(`/api/user/products/electronics/${encodeURIComponent(slug)}/images`, { params })
     return res.data
   },
 
@@ -236,4 +256,180 @@ export const electronicsListingService = {
   },
 }
 
+/**
+ * Service specifically for User Electronics Images controller endpoints:
+ * (/api/user/products/electronics/{slug}/images/**)
+ */
+export const userElectronicsImageService = {
+  getImages: async (slug, params = {}) => {
+    const res = await api.get(`/api/user/products/electronics/${encodeURIComponent(slug)}/images`, { params })
+    return res.data
+  },
+  getPrimaryImage: async (slug) => {
+    const res = await api.get(`/api/user/products/electronics/${encodeURIComponent(slug)}/images/primary`)
+    return res.data
+  },
+  uploadImages: async (slug, files) => {
+    return electronicsListingService.uploadImages(slug, files)
+  },
+  updateImage: async (slug, imageId, file) => {
+    return electronicsListingService.updateImage(slug, imageId, file)
+  },
+  deleteImage: async (slug, imageId) => {
+    return electronicsListingService.deleteImage(slug, imageId)
+  },
+  setPrimaryImage: async (slug, imageId) => {
+    return electronicsListingService.setPrimaryImage(slug, imageId)
+  },
+  updateImageOrder: async (slug, imageId, displayOrder) => {
+    return electronicsListingService.updateImageOrder(slug, imageId, displayOrder)
+  },
+  reorderImage: async (slug, imageId, displayOrder) => {
+    return electronicsListingService.updateImageOrder(slug, imageId, displayOrder)
+  },
+}
+
+/**
+ * Service specifically for Dealer Electronics Images controller endpoints:
+ * (/api/dealer/products/electronics/{slug}/images/**)
+ */
+export const dealerElectronicsImageService = {
+  getImages: async (slug, params = {}) => {
+    const res = await api.get(`/api/dealer/products/electronics/${encodeURIComponent(slug)}/images`, { params })
+    return res.data
+  },
+  getPrimaryImage: async (slug) => {
+    const res = await api.get(`/api/dealer/products/electronics/${encodeURIComponent(slug)}/images/primary`)
+    return res.data
+  },
+  uploadImages: async (slug, files) => {
+    const formData = new FormData()
+    const fileList = Array.isArray(files) ? files : [files]
+    fileList.forEach((file) => formData.append('files', file))
+    const res = await api.post(`/api/dealer/products/electronics/${encodeURIComponent(slug)}/images`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return res.data
+  },
+  updateImage: async (slug, imageId, file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await api.put(
+      `/api/dealer/products/electronics/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }
+    )
+    return res.data
+  },
+  deleteImage: async (slug, imageId) => {
+    const res = await api.delete(
+      `/api/dealer/products/electronics/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}`
+    )
+    return res.data
+  },
+  setPrimaryImage: async (slug, imageId) => {
+    const res = await api.put(
+      `/api/dealer/products/electronics/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}/primary`
+    )
+    return res.data
+  },
+  updateImageOrder: async (slug, imageId, displayOrder) => {
+    const res = await api.put(
+      `/api/dealer/products/electronics/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}/order`,
+      null,
+      {
+        params: { displayOrder: parseInt(displayOrder, 10) },
+      }
+    )
+    return res.data
+  },
+  reorderImage: async (slug, imageId, displayOrder) => {
+    return dealerElectronicsImageService.updateImageOrder(slug, imageId, displayOrder)
+  },
+}
+
+/**
+ * Unified Electronics Image Service that dispatches to either User or Dealer endpoints,
+ * with automatic fallback if one controller returns 404/403.
+ */
+export const electronicsImageService = {
+  getService: (isDealer = false) => (isDealer ? dealerElectronicsImageService : userElectronicsImageService),
+  getImages: async (slug, params = {}, isDealer = false) => {
+    try {
+      return await (isDealer ? dealerElectronicsImageService : userElectronicsImageService).getImages(slug, params)
+    } catch (err) {
+      if (err?.response?.status === 404 || err?.response?.status === 403) {
+        return await (!isDealer ? dealerElectronicsImageService : userElectronicsImageService).getImages(slug, params)
+      }
+      throw err
+    }
+  },
+  getPrimaryImage: async (slug, isDealer = false) => {
+    try {
+      return await (isDealer ? dealerElectronicsImageService : userElectronicsImageService).getPrimaryImage(slug)
+    } catch (err) {
+      if (err?.response?.status === 404 || err?.response?.status === 403) {
+        return await (!isDealer ? dealerElectronicsImageService : userElectronicsImageService).getPrimaryImage(slug)
+      }
+      throw err
+    }
+  },
+  uploadImages: async (slug, files, isDealer = false) => {
+    try {
+      return await (isDealer ? dealerElectronicsImageService : userElectronicsImageService).uploadImages(slug, files)
+    } catch (err) {
+      if (err?.response?.status === 404 || err?.response?.status === 403) {
+        return await (!isDealer ? dealerElectronicsImageService : userElectronicsImageService).uploadImages(slug, files)
+      }
+      throw err
+    }
+  },
+  updateImage: async (slug, imageId, file, isDealer = false) => {
+    try {
+      return await (isDealer ? dealerElectronicsImageService : userElectronicsImageService).updateImage(slug, imageId, file)
+    } catch (err) {
+      if (err?.response?.status === 404 || err?.response?.status === 403) {
+        return await (!isDealer ? dealerElectronicsImageService : userElectronicsImageService).updateImage(slug, imageId, file)
+      }
+      throw err
+    }
+  },
+  deleteImage: async (slug, imageId, isDealer = false) => {
+    try {
+      return await (isDealer ? dealerElectronicsImageService : userElectronicsImageService).deleteImage(slug, imageId)
+    } catch (err) {
+      if (err?.response?.status === 404 || err?.response?.status === 403) {
+        return await (!isDealer ? dealerElectronicsImageService : userElectronicsImageService).deleteImage(slug, imageId)
+      }
+      throw err
+    }
+  },
+  setPrimaryImage: async (slug, imageId, isDealer = false) => {
+    try {
+      return await (isDealer ? dealerElectronicsImageService : userElectronicsImageService).setPrimaryImage(slug, imageId)
+    } catch (err) {
+      if (err?.response?.status === 404 || err?.response?.status === 403) {
+        return await (!isDealer ? dealerElectronicsImageService : userElectronicsImageService).setPrimaryImage(slug, imageId)
+      }
+      throw err
+    }
+  },
+  updateImageOrder: async (slug, imageId, displayOrder, isDealer = false) => {
+    try {
+      return await (isDealer ? dealerElectronicsImageService : userElectronicsImageService).updateImageOrder(slug, imageId, displayOrder)
+    } catch (err) {
+      if (err?.response?.status === 404 || err?.response?.status === 403) {
+        return await (!isDealer ? dealerElectronicsImageService : userElectronicsImageService).updateImageOrder(slug, imageId, displayOrder)
+      }
+      throw err
+    }
+  },
+  reorderImage: async (slug, imageId, displayOrder, isDealer = false) => {
+    return electronicsImageService.updateImageOrder(slug, imageId, displayOrder, isDealer)
+  },
+}
+
 export default electronicsListingService
+

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
-  AlertCircle, Archive, Check, CheckCircle2, Clock, ImagePlus, Pencil, Plus,
+  AlertCircle, Archive, Check, CheckCircle2, Clock, Eye, ImagePlus, Pencil, Plus,
   RefreshCw, Rocket, ShieldCheck, Tag, Trash2, Upload, Wrench, X,
 } from 'lucide-react'
 import Breadcrumb from '../components/common/Breadcrumb'
@@ -11,6 +11,8 @@ import TextArea from '../components/forms/TextArea'
 import Dropdown from '../components/forms/Dropdown'
 import Badge from '../components/common/Badge'
 import SellAccessGate from '../components/common/SellAccessGate'
+import ConfirmModal from '../components/common/ConfirmModal'
+import SparePartsImagesManager from '../components/dashboard/SparePartsImagesManager'
 import { useAuth } from '../hooks/useAuth'
 import { useKyc } from '../hooks/useKyc'
 import { useSparePartsListings } from '../hooks/useSparePartsListings'
@@ -59,7 +61,7 @@ const initialForm = () => ({
 })
 
 export default function SellSparePart() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const { isKycVerified } = useKyc()
   const {
     listings: sparePartsListings,
@@ -74,67 +76,64 @@ export default function SellSparePart() {
   } = useSparePartsListings()
   const location = useLocation()
   const navigate = useNavigate()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const { slug } = useParams()
 
   useEffect(() => {
     fetchListings().catch(() => { })
   }, [fetchListings])
 
-  // View state: 'create' or 'listings'
-  const [viewMode, setViewMode] = useState(() => searchParams.get('mode') === 'listings' ? 'listings' : 'create')
+  const viewMode = location.pathname === '/sell/spare-parts' ? 'listings' : 'create'
 
   // Step tabs inside form
-  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') || 'details')
+  const [activeTab, setActiveTab] = useState('details')
   const [form, setForm] = useState(initialForm)
   const [selectedFiles, setSelectedFiles] = useState([])
-  const [editingSlug, setEditingSlug] = useState(() => searchParams.get('slug') || null)
+  const [editingSlug, setEditingSlug] = useState(slug || null)
 
-  // URL search parameter synchronization
   useEffect(() => {
-    const modeParam = searchParams.get('mode') || 'create'
-    const slugParam = searchParams.get('slug')
-    const tabParam = searchParams.get('tab')
-
-    if (modeParam === 'listings') {
-      setViewMode('listings')
+    if (viewMode === 'listings') {
       setEditingSlug(null)
-    } else if (modeParam === 'edit' && slugParam) {
-      setViewMode('create')
-      if (editingSlug !== slugParam) {
-        setEditingSlug(slugParam)
-        sparePartsListingService.getBySlug(slugParam).then((detail) => {
-          if (detail) {
-            setForm({
-              category: detail.category || '',
-              subCategory: detail.subCategory || '',
-              brand: detail.brand || '',
-              partNumber: detail.partNumber || '',
-              title: detail.title || '',
-              condition: detail.condition || 'NEW',
-              description: detail.description || '',
-              price: detail.price ?? '',
-              negotiable: Boolean(detail.negotiable),
-              compatibleVehicleBrand: detail.compatibleVehicleBrand || '',
-              compatibleVehicleModel: detail.compatibleVehicleModel || '',
-              compatibleVehicleVariant: detail.compatibleVehicleVariant || '',
-            })
-          }
-        }).catch((err) => console.warn('Error loading spare part by slug from URL:', err))
-      }
-    } else {
-      setViewMode('create')
+      return
     }
 
-    if (tabParam && ['details', 'pricing', 'photos', 'preview'].includes(tabParam)) {
-      setActiveTab(tabParam)
+    if (location.pathname === '/sell/spare-parts/add-part') {
+      if (editingSlug !== null) {
+        setEditingSlug(null)
+        setForm(initialForm())
+        setSelectedFiles([])
+      }
+      return
     }
-  }, [searchParams])
+
+    if (slug && editingSlug !== slug) {
+      setEditingSlug(slug)
+      sparePartsListingService.getBySlug(slug).then((detail) => {
+        if (detail) {
+          setForm({
+            category: detail.category || '',
+            subCategory: detail.subCategory || '',
+            brand: detail.brand || '',
+            partNumber: detail.partNumber || '',
+            title: detail.title || '',
+            condition: detail.condition || 'NEW',
+            description: detail.description || '',
+            price: detail.price ?? '',
+            negotiable: Boolean(detail.negotiable),
+            compatibleVehicleBrand: detail.compatibleVehicleBrand || '',
+            compatibleVehicleModel: detail.compatibleVehicleModel || '',
+            compatibleVehicleVariant: detail.compatibleVehicleVariant || '',
+          })
+        }
+      }).catch((err) => console.warn('Error loading spare part by slug from URL:', err))
+    }
+  }, [location.pathname, slug, viewMode, editingSlug])
 
   // API status messages
   const [apiSuccessMsg, setApiSuccessMsg] = useState(null)
   const [apiErrorMsg, setApiErrorMsg] = useState(null)
   const [submitting, setSubmitting] = useState(false)
-  const [deletingSlug, setDeletingSlug] = useState(null)
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: '', slug: '', processing: false })
+  const [managingImagesSlug, setManagingImagesSlug] = useState(null)
 
   const update = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
 
@@ -207,10 +206,14 @@ export default function SellSparePart() {
       setApiSuccessMsg('Spare part listing submitted for review! Our team will review it shortly.')
       await fetchListings()
       setTimeout(() => {
-        setSearchParams({ mode: 'listings' })
+        navigate('/sell/spare-parts')
       }, 1200)
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Failed to submit spare part listing.'
+      let msg = err?.response?.data?.message || err?.message || 'Failed to submit spare part listing.'
+      if (err?.response?.data?.errors) {
+        const fieldErrors = Object.values(err.response.data.errors).join(', ')
+        if (fieldErrors) msg += ` - ${fieldErrors}`
+      }
       setApiErrorMsg(msg)
     } finally {
       setSubmitting(false)
@@ -244,11 +247,50 @@ export default function SellSparePart() {
       setApiSuccessMsg('Draft saved successfully! You can view and manage it from your Spare Parts Listings.')
       await fetchListings()
       setTimeout(() => {
-        setSearchParams({ mode: 'listings' })
+        navigate('/sell/spare-parts')
       }, 1200)
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Failed to save draft.'
+      let msg = err?.response?.data?.message || err?.message || 'Failed to save draft.'
+      if (err?.response?.data?.errors) {
+        const fieldErrors = Object.values(err.response.data.errors).join(', ')
+        if (fieldErrors) msg += ` - ${fieldErrors}`
+      }
       setApiErrorMsg(msg)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Save details only and return the slug
+  const handleSaveDetails = async () => {
+    if (!detailsValid || submitting) return null
+    setSubmitting(true)
+    setApiErrorMsg(null)
+    setApiSuccessMsg(null)
+
+    try {
+      let slugResult = editingSlug
+      if (slugResult) {
+        await patchListing(slugResult, buildPayload())
+      } else {
+        const created = await createListing(buildPayload())
+        slugResult = created?.slug
+        if (slugResult) {
+          setEditingSlug(slugResult)
+          navigate(`/sell/spare-parts/${slugResult}`, { replace: true })
+        }
+      }
+
+      setApiSuccessMsg('Spare part details saved successfully!')
+      return slugResult
+    } catch (err) {
+      let msg = err?.response?.data?.message || err?.message || 'Failed to save spare part details.'
+      if (err?.response?.data?.errors) {
+        const fieldErrors = Object.values(err.response.data.errors).join(', ')
+        if (fieldErrors) msg += ` - ${fieldErrors}`
+      }
+      setApiErrorMsg(msg)
+      return null
     } finally {
       setSubmitting(false)
     }
@@ -262,13 +304,14 @@ export default function SellSparePart() {
     setActiveTab('details')
     setApiErrorMsg(null)
     setApiSuccessMsg(null)
-    setSearchParams({ mode: 'create', tab: 'details' })
+    navigate('/sell/spare-parts/add-part')
   }
 
   // Populate form for editing existing spare part
   const handleEditSparePartCard = async (item) => {
     setEditingSlug(item.slug)
-    setSearchParams({ mode: 'edit', slug: item.slug, tab: 'details' })
+    navigate(`/sell/spare-parts/${item.slug}`)
+    setActiveTab('details')
     setForm({
       category: item.category || '',
       subCategory: item.subCategory || '',
@@ -311,35 +354,32 @@ export default function SellSparePart() {
     }
   }
 
-  const handleDeleteSparePartCard = async (slug) => {
-    if (!window.confirm('Are you sure you want to delete this spare part listing?')) return
-    setDeletingSlug(slug)
-    try {
-      await deleteListing(slug)
-      setApiSuccessMsg('Spare part listing deleted successfully!')
-    } catch (err) {
-      alert(`Failed to delete spare part: ${err?.response?.data?.message || err?.message}`)
-    } finally {
-      setDeletingSlug(null)
-    }
+  const requestAction = (type, slug) => {
+    setConfirmModal({ isOpen: true, type, slug, processing: false })
   }
 
-  const handleMakeSparePartAvailable = async (slug) => {
+  const executeAction = async () => {
+    const { type, slug } = confirmModal
+    setConfirmModal(prev => ({ ...prev, processing: true }))
     try {
-      await makeAvailableListing(slug)
-      setApiSuccessMsg('Spare part marked as Available!')
+      if (type === 'delete') {
+        await deleteListing(slug)
+        setApiSuccessMsg('Spare part listing deleted successfully!')
+      } else if (type === 'archive') {
+        await archiveListing(slug)
+        setApiSuccessMsg('Spare part listing archived!')
+      } else if (type === 'submit') {
+        await submitListing(slug)
+        setApiSuccessMsg('Spare part listing submitted for review!')
+      } else if (type === 'available') {
+        await makeAvailableListing(slug)
+        setApiSuccessMsg('Spare part marked as Available!')
+      }
+      setConfirmModal({ isOpen: false, type: '', slug: '', processing: false })
+      await fetchListings()
     } catch (err) {
-      alert(`Failed to make spare part available: ${err?.response?.data?.message || err?.message}`)
-    }
-  }
-
-  const handleArchiveSparePart = async (slug) => {
-    if (!window.confirm('Archive this spare part listing?')) return
-    try {
-      await archiveListing(slug)
-      setApiSuccessMsg('Spare part listing archived!')
-    } catch (err) {
-      alert(`Failed to archive spare part: ${err?.response?.data?.message || err?.message}`)
+      alert(`Failed to perform action: ${err?.response?.data?.message || err?.message}`)
+      setConfirmModal(prev => ({ ...prev, processing: false }))
     }
   }
 
@@ -354,7 +394,7 @@ export default function SellSparePart() {
 
   return (
     <div className="container-page py-8">
-      <Breadcrumb items={[{ label: 'Sell', to: '/sell' }, { label: 'Sell Spare Parts' }]} />
+      <Breadcrumb items={[{ label: 'Sell', to: '/sell/spare-parts' }, { label: 'Sell Spare Parts' }]} />
 
       {/* Top Header Mode Toggle & Actions */}
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-border pb-6">
@@ -369,7 +409,9 @@ export default function SellSparePart() {
           <div className="flex rounded-xl border border-border bg-surface-alt p-1">
             <button
               type="button"
-              onClick={() => setSearchParams({ mode: editingSlug ? 'edit' : 'create', ...(editingSlug ? { slug: editingSlug } : {}), tab: activeTab })}
+              onClick={() => {
+                navigate(editingSlug ? `/sell/spare-parts/${editingSlug}` : '/sell/spare-parts/add-part')
+              }}
               className={cn(
                 'flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-colors',
                 viewMode === 'create' ? 'bg-surface text-primary shadow-soft' : 'text-text-secondary hover:text-text'
@@ -381,7 +423,7 @@ export default function SellSparePart() {
               type="button"
               onClick={() => {
                 fetchListings()
-                setSearchParams({ mode: 'listings' })
+                navigate('/sell/spare-parts')
               }}
               className={cn(
                 'flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-colors',
@@ -392,9 +434,7 @@ export default function SellSparePart() {
             </button>
           </div>
 
-          <Button variant="primary" icon={Wrench} onClick={handleStartNewSparePart}>
-            Sell Spare Part
-          </Button>
+
         </div>
       </div>
 
@@ -422,14 +462,7 @@ export default function SellSparePart() {
       {/* MODE 1: CREATE / EDIT SPARE PART FORM */}
       {viewMode === 'create' && (
         <div className="mx-auto max-w-full">
-          {editingSlug && (
-            <div className="mb-6 flex items-center justify-between rounded-xl bg-primary/10 p-4 text-sm font-semibold text-primary">
-              <span>Editing Spare Part: {editingSlug}</span>
-              <button type="button" onClick={handleStartNewSparePart} className="text-xs underline hover:no-underline">
-                Cancel Edit
-              </button>
-            </div>
-          )}
+
 
           <div className="mb-6 flex flex-wrap gap-6 border-b border-border">
             {TABS.map((tab) => (
@@ -438,7 +471,6 @@ export default function SellSparePart() {
                 type="button"
                 onClick={() => {
                   setActiveTab(tab.id)
-                  setSearchParams({ mode: editingSlug ? 'edit' : 'create', ...(editingSlug ? { slug: editingSlug } : {}), tab: tab.id })
                 }}
                 className={cn(
                   'flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-colors',
@@ -535,6 +567,27 @@ export default function SellSparePart() {
                   onChange={(e) => update('description', e.target.value)}
                   rows={4}
                 />
+
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+                  <p className="text-xs text-text-secondary">
+                    Save details anytime to unlock the full Photos Manager (upload, reorder, primary cover, replace).
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    icon={ImagePlus}
+                    disabled={!detailsValid || submitting}
+                    loading={submitting}
+                    onClick={async () => {
+                      const savedSlug = await handleSaveDetails()
+                      if (savedSlug) {
+                        setActiveTab('photos')
+                      }
+                    }}
+                  >
+                    Save Details &amp; Manage Photos
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -561,42 +614,48 @@ export default function SellSparePart() {
             )}
 
             {activeTab === 'photos' && (
-              <div className="space-y-5">
-                <h2 className="text-lg font-bold text-text">Photos</h2>
-                <p className="-mt-3 text-xs text-text-secondary">Upload clear photos of the part, part number tag, and packaging.</p>
-
-                <div className="flex flex-col gap-4">
-                  <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-surface-alt py-10 transition-colors hover:border-primary hover:bg-primary/5">
-                    <div className="mb-2 rounded-full bg-primary/10 p-3 text-primary">
-                      <ImagePlus size={24} />
+              <div>
+                {editingSlug ? (
+                  <SparePartsImagesManager slug={editingSlug} isDealer={user?.role === 'DEALER'} />
+                ) : (
+                  <div className="space-y-6 rounded-2xl border border-dashed border-border bg-surface-alt/50 p-8 text-center sm:p-12">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                      <ImagePlus size={28} />
                     </div>
-                    <p className="font-semibold text-text">Click to upload photos</p>
-                    <p className="mt-1 text-xs text-text-light">JPG, PNG, WEBP (Max 8 photos, 5MB each)</p>
-                    <input type="file" multiple accept="image/*" className="hidden" onChange={handleFileChange} />
-                  </label>
-
-                  {selectedFiles.length > 0 && (
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      {selectedFiles.map((file, idx) => (
-                        <div key={idx} className="group relative aspect-[4/3] overflow-hidden rounded-xl border border-border bg-surface-alt">
-                          <img src={URL.createObjectURL(file)} alt="" className="h-full w-full object-cover" />
-                          {idx === 0 && (
-                            <span className="absolute left-2 top-2 rounded bg-primary px-1.5 py-0.5 text-[10px] font-bold text-white shadow">
-                              COVER
-                            </span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => removeFile(idx)}
-                            className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition-transform hover:scale-110 hover:bg-danger"
-                          >
-                            <X size={14} aria-hidden="true" />
-                          </button>
-                        </div>
-                      ))}
+                    <div className="space-y-1">
+                      <h2 className="text-lg font-bold text-text">Save Details to Open Photo Manager</h2>
+                      <p className="mx-auto max-w-md text-xs text-text-secondary">
+                        Please save the spare part details first to enable the full Spare Part Images Manager with live reordering, cover photo selection, replace photo, and drag-and-drop uploads.
+                      </p>
                     </div>
-                  )}
-                </div>
+
+                    <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+                      <Button
+                        variant="primary"
+                        icon={CheckCircle2}
+                        disabled={submitting}
+                        loading={submitting}
+                        onClick={async () => {
+                          const savedSlug = await handleSaveDetails()
+                          if (savedSlug) {
+                            setActiveTab('photos')
+                          }
+                        }}
+                      >
+                        {detailsValid ? 'Save Details & Open Photo Manager' : 'Fill Details (Category, Brand, Title, Description) to Continue'}
+                      </Button>
+                      {!detailsValid && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab('details')}
+                          className="text-xs font-semibold text-primary hover:underline"
+                        >
+                          &larr; Go to Part Details Tab
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -682,9 +741,7 @@ export default function SellSparePart() {
               </div>
               <h3 className="text-xl font-bold text-text">No Spare Part Listings Found</h3>
               <p className="mt-1 text-xs text-text-secondary">List your batteries, tyres, engine parts, or accessories to reach buyers across SwipeDeals.</p>
-              <Button variant="primary" className="mt-6" icon={Plus} onClick={handleStartNewSparePart}>
-                Sell Spare Part
-              </Button>
+
             </div>
           ) : (
             <div className="space-y-6">
@@ -753,70 +810,81 @@ export default function SellSparePart() {
                         )}
 
                         {/* Action Buttons */}
-                        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border/60 pt-4 mt-4">
-                          {item.status === 'DRAFT' && (
-                            <Button
-                              size="xs"
-                              variant="primary"
-                              icon={Rocket}
-                              className="font-extrabold shadow-soft px-2 py-2"
-                              onClick={async () => {
-                                try {
-                                  await submitListing(item.slug)
-                                  setApiSuccessMsg('Spare part submitted for review!')
-                                } catch (err) {
-                                  alert(`Failed to submit: ${err?.message}`)
-                                }
-                              }}
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-4 mt-4">
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              className="group inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition-all hover:bg-primary/10 hover:shadow-xs active:scale-95"
+                              onClick={() => setManagingImagesSlug(item.slug)}
+                              title="Manage Photos"
                             >
-                              Submit for Review
-                            </Button>
-                          )}
+                              <ImagePlus size={14} className="text-primary" />
+                              <span>Photos</span>
+                              <span className="rounded-md bg-primary/20 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                                {imagesCount}
+                              </span>
+                            </button>
+                          </div>
 
-                          {item.status !== 'AVAILABLE' && item.status !== 'APPROVED' && (
-                            <Button
-                              size="xs"
-                              variant="outline"
-                              icon={CheckCircle2}
-                              className="border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-600 hover:text-white font-bold transition-all shadow-xs px-2 py-2"
-                              onClick={() => handleMakeSparePartAvailable(item.slug)}
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            {item.status === 'DRAFT' && (
+                              <button
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-white shadow-xs transition-all hover:bg-primary/90 hover:shadow-md active:scale-95"
+                                onClick={() => requestAction('submit', item.slug)}
+                              >
+                                <Rocket size={13} />
+                                <span>Send for Verification</span>
+                              </button>
+                            )}
+
+                            <Link
+                              to={`/spare-parts/${item.slug || item.id}?from=sell`}
+                              state={{ from: '/sell/spare-parts' }}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text-secondary shadow-xs transition-all hover:border-primary/40 hover:bg-surface-alt hover:text-primary active:scale-95"
+                              title="View Details"
                             >
-                              Make Available
-                            </Button>
-                          )}
+                              <Eye size={14} />
+                              <span>View Details</span>
+                            </Link>
 
-                          {item.status !== 'ARCHIVED' && (
-                            <Button
-                              size="xs"
-                              variant="outline"
-                              icon={Archive}
-                              className="border-amber-500/40 bg-amber-500/10 text-amber-700 hover:bg-amber-600 hover:text-white font-bold transition-all shadow-xs px-2 py-2"
-                              onClick={() => handleArchiveSparePart(item.slug)}
+                            {item.status !== 'AVAILABLE' && item.status !== 'APPROVED' && (
+                              <button
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-600 shadow-xs transition-all hover:bg-emerald-500 hover:text-white active:scale-95"
+                                onClick={() => requestAction('available', item.slug)}
+                              >
+                                <CheckCircle2 size={14} />
+                                <span>Make Available</span>
+                              </button>
+                            )}
+
+                            <button
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text-secondary shadow-xs transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary active:scale-95"
+                              onClick={() => handleEditSparePartCard(item)}
+                              title="Edit Details"
                             >
-                              Archive
-                            </Button>
-                          )}
+                              <Pencil size={14} />
+                              <span>Edit Details</span>
+                            </button>
 
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            icon={Pencil}
-                            className="border-primary/40 bg-primary/10 text-primary hover:bg-primary hover:text-white font-bold transition-all shadow-xs px-2 py-2"
-                            onClick={() => handleEditSparePartCard(item)}
-                          >
-                            Edit Details
-                          </Button>
+                            {item.status !== 'ARCHIVED' && (
+                              <button
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text-secondary shadow-xs transition-all hover:border-amber-400/40 hover:bg-amber-500/10 hover:text-amber-600 active:scale-95"
+                                onClick={() => requestAction('archive', item.slug)}
+                                title="Archive Listing"
+                              >
+                                <Archive size={14} />
+                                <span>Archive</span>
+                              </button>
+                            )}
 
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            icon={Trash2}
-                            className="border-rose-500/40 bg-rose-500/10 text-rose-600 hover:bg-rose-600 hover:text-white font-bold transition-all shadow-xs px-2 py-2"
-                            disabled={deletingSlug === item.slug}
-                            onClick={() => handleDeleteSparePartCard(item.slug)}
-                          >
-                            {deletingSlug === item.slug ? 'Deleting...' : 'Delete'}
-                          </Button>
+                            <button
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-danger/30 bg-danger/5 px-3 py-1.5 text-xs font-semibold text-danger shadow-xs transition-all hover:bg-danger/10 active:scale-95"
+                              onClick={() => requestAction('delete', item.slug)}
+                              title="Delete Listing"
+                            >
+                              <Trash2 size={14} />
+                              <span>Delete</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -827,6 +895,44 @@ export default function SellSparePart() {
           )}
         </div>
       )}
+
+      {/* Modal image manager */}
+      {managingImagesSlug && (
+        <SparePartsImagesManager
+          slug={managingImagesSlug}
+          isDealer={user?.role === 'DEALER'}
+          onClose={() => {
+            setManagingImagesSlug(null)
+            fetchListings()
+          }}
+        />
+      )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        isLoading={confirmModal.processing}
+        onClose={() => setConfirmModal({ isOpen: false, type: '', slug: '', processing: false })}
+        onConfirm={executeAction}
+        title={
+          confirmModal.type === 'delete' ? 'Delete Spare Part Listing' :
+            confirmModal.type === 'archive' ? 'Archive Spare Part Listing' :
+              confirmModal.type === 'submit' ? 'Submit for Review' :
+                'Make Spare Part Available'
+        }
+        message={
+          confirmModal.type === 'delete' ? 'Are you sure you want to permanently delete this spare part listing? This action cannot be undone.' :
+            confirmModal.type === 'archive' ? 'Are you sure you want to archive this spare part? It will be hidden from public view.' :
+              confirmModal.type === 'submit' ? 'Are you sure you want to submit this item for verification? Our team will review the details before making it public.' :
+                'Are you sure you want to make this spare part publicly available on the marketplace?'
+        }
+        confirmText={
+          confirmModal.type === 'delete' ? 'Delete' :
+            confirmModal.type === 'archive' ? 'Archive' :
+              confirmModal.type === 'submit' ? 'Submit' :
+                'Make Available'
+        }
+        variant={confirmModal.type === 'delete' ? 'danger' : confirmModal.type === 'archive' ? 'warning' : 'primary'}
+      />
     </div>
   )
 }

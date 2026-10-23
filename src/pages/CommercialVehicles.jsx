@@ -22,12 +22,12 @@ export default function CommercialVehicles() {
   const [sort, setSort] = useState('relevance')
   const [page, setPage] = useState(1)
 
-  // "Commercial vehicles" maps to the backend's TRUCK vehicle type.
+  // "Commercial vehicles" maps to the backend's COMMERCIAL_VEHICLES vehicleType.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     vehicleService
-      .getAll({ type: 'TRUCK', size: 100, sort: 'createdAt,desc' })
+      .getAll({ vehicleType: 'COMMERCIAL_VEHICLES', size: 100, sort: 'createdAt,desc' })
       .then((res) => {
         if (cancelled) return
         const content = res?.data?.content

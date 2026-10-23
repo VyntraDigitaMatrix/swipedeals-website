@@ -26,8 +26,16 @@ export default function ElectronicsCard({ item, index = 0 }) {
       transition={{ duration: 0.4, delay: (index % 8) * 0.05 }}
       className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift"
     >
-      <Link to={`/electronics/${item.id}`} className="relative block aspect-square overflow-hidden bg-surface-alt">
-        <img src={images[0]} alt={item.title} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
+      <Link
+        to={`/electronics/${item.id}`}
+        className="relative block h-64 w-full overflow-hidden bg-surface-alt sm:h-60 lg:h-64"
+      >
+        <img
+          src={images?.[0]}
+          alt={item.title}
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-contain p-2 transition-transform duration-300 group-hover:scale-[1.03]"
+        />
         <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
           {discount > 0 && (
             <Badge variant="danger" icon={TagIcon} className="bg-white/95">

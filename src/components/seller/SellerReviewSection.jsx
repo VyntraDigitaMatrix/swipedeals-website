@@ -235,7 +235,7 @@ export default function SellerReviewSection({ sellerId, sellerName = 'Seller' })
                   <User size={14} />
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-text">Verified Buyer</p>
+                  <p className="text-xs font-bold text-text">{r.reviewerName}</p>
                   <div className="flex items-center gap-1 mt-0.5">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <Star

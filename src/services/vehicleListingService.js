@@ -354,13 +354,31 @@ export const vehicleListingService = {
 
 /**
  * Service for User Vehicle Images (/api/user/vehicles/{vehicleSlug}/images/**)
+ * Fully compliant with SwipeDeals User Vehicle Images Swagger Controller specification.
  */
 export const vehicleImageService = {
+  /**
+   * GET /api/user/vehicles/{vehicleSlug}/images
+   * Returns all images belonging to a vehicle owned by the authenticated user in display order.
+   */
   getImages: async (vehicleSlug) => {
     const res = await api.get(`/api/user/vehicles/${encodeURIComponent(vehicleSlug)}/images`)
     return res.data
   },
 
+  /**
+   * GET /api/user/vehicles/{vehicleSlug}/images/primary
+   * Returns the primary image of the user's vehicle.
+   */
+  getPrimaryImage: async (vehicleSlug) => {
+    const res = await api.get(`/api/user/vehicles/${encodeURIComponent(vehicleSlug)}/images/primary`)
+    return res.data
+  },
+
+  /**
+   * POST /api/user/vehicles/{vehicleSlug}/images
+   * Uploads an image for a vehicle owned by the authenticated user.
+   */
   uploadImage: async (vehicleSlug, file) => {
     const formData = new FormData()
     formData.append('file', file)
@@ -370,6 +388,9 @@ export const vehicleImageService = {
     return res.data
   },
 
+  /**
+   * Convenience helper to upload multiple images sequentially.
+   */
   uploadMultiple: async (vehicleSlug, files) => {
     const results = []
     for (const file of files) {
@@ -383,13 +404,64 @@ export const vehicleImageService = {
     return results
   },
 
-  setPrimaryImage: async (vehicleSlug, imageId) => {
-    const res = await api.patch(`/api/user/vehicles/${encodeURIComponent(vehicleSlug)}/images/${imageId}/primary`)
+  /**
+   * PUT /api/user/vehicles/{vehicleSlug}/images/{imageId}
+   * Replaces an existing vehicle image with a new file.
+   */
+  updateImage: async (vehicleSlug, imageId, file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await api.put(
+      `/api/user/vehicles/${encodeURIComponent(vehicleSlug)}/images/${encodeURIComponent(imageId)}`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }
+    )
     return res.data
   },
 
+  /**
+   * PUT /api/user/vehicles/{vehicleSlug}/images/{imageId}/order
+   * Updates the display order of a vehicle image.
+   */
+  updateImageOrder: async (vehicleSlug, imageId, displayOrder) => {
+    const res = await api.put(
+      `/api/user/vehicles/${encodeURIComponent(vehicleSlug)}/images/${encodeURIComponent(imageId)}/order`,
+      null,
+      {
+        params: { displayOrder: parseInt(displayOrder, 10) },
+      }
+    )
+    return res.data
+  },
+
+  /**
+   * Alias for updateImageOrder.
+   */
+  reorderImage: async (vehicleSlug, imageId, displayOrder) => {
+    return vehicleImageService.updateImageOrder(vehicleSlug, imageId, displayOrder)
+  },
+
+  /**
+   * PATCH /api/user/vehicles/{vehicleSlug}/images/{imageId}/primary
+   * Sets the specified image as the primary image of the vehicle.
+   */
+  setPrimaryImage: async (vehicleSlug, imageId) => {
+    const res = await api.patch(
+      `/api/user/vehicles/${encodeURIComponent(vehicleSlug)}/images/${encodeURIComponent(imageId)}/primary`
+    )
+    return res.data
+  },
+
+  /**
+   * DELETE /api/user/vehicles/{vehicleSlug}/images/{imageId}
+   * Deletes an image belonging to a vehicle owned by the authenticated user.
+   */
   deleteImage: async (vehicleSlug, imageId) => {
-    const res = await api.delete(`/api/user/vehicles/${encodeURIComponent(vehicleSlug)}/images/${imageId}`)
+    const res = await api.delete(
+      `/api/user/vehicles/${encodeURIComponent(vehicleSlug)}/images/${encodeURIComponent(imageId)}`
+    )
     return res.data
   },
 }
@@ -463,17 +535,18 @@ export const featureMasterService = {
    * @param {string} vehicleType - e.g. 'CARS', 'TWO_WHEELER', 'COMMERCIAL_VEHICLES'
    */
   getFeaturesByVehicleType: async (vehicleType) => {
-    let mappedType = 'CAR' // Default fallback
+    // API expects: CARS | TWO_WHEELER | CONSTRUCTION_VEHICLES | COMMERCIAL_VEHICLES | OTHERS
+    let mappedType = 'CARS' // Default fallback
     if (vehicleType) {
       const vType = vehicleType.toUpperCase()
-      if (vType === 'CARS' || vType === 'CAR') mappedType = 'CAR'
+      if (vType === 'CARS' || vType === 'CAR') mappedType = 'CARS'
       else if (vType === 'TWO_WHEELER' || vType === 'BIKE') mappedType = 'TWO_WHEELER'
-      else if (vType === 'COMMERCIAL_VEHICLES' || vType === 'COMMERCIAL_VEHICLE' || vType === 'TRUCK') mappedType = 'COMMERCIAL'
-      else if (vType === 'CONSTRUCTION_VEHICLES' || vType === 'CONSTRUCTION_VEHICLE' || vType === 'CONSTRUCTION') mappedType = 'CONSTRUCTION'
-      else if (vType === 'OTHERS' || vType === 'OTHER') mappedType = 'OTHER'
-      else mappedType = vType // Trust the passed value if not in the map
+      else if (vType === 'COMMERCIAL_VEHICLES' || vType === 'COMMERCIAL_VEHICLE' || vType === 'COMMERCIAL' || vType === 'TRUCK') mappedType = 'COMMERCIAL_VEHICLES'
+      else if (vType === 'CONSTRUCTION_VEHICLES' || vType === 'CONSTRUCTION_VEHICLE' || vType === 'CONSTRUCTION') mappedType = 'CONSTRUCTION_VEHICLES'
+      else if (vType === 'OTHERS' || vType === 'OTHER') mappedType = 'OTHERS'
+      // else: fall back to 'CARS'
     }
-    
+
     const res = await api.get(`/api/admin/vehicle-feature-masters/vehicle-type/${encodeURIComponent(mappedType)}`)
     return res.data
   },

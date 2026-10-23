@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams, useParams } from 'react-router-dom'
 import {
-  AlertCircle, ArrowRight, CarFront, Check, Clock, Eye, FileCheck, FileText, Home as HomeIcon,
+  AlertCircle, Archive, ArrowRight, CarFront, Check, Clock, Eye, FileCheck, FileText, Home as HomeIcon,
   ImagePlus, Laptop, MapPin, Pencil, Phone, Plus, RefreshCw, Rocket, Settings, ShieldCheck,
   Sliders, Sparkles, Trash2, Truck, Upload, User, X,
 } from 'lucide-react'
@@ -12,6 +12,7 @@ import TextArea from '../components/forms/TextArea'
 import Dropdown from '../components/forms/Dropdown'
 import Badge from '../components/common/Badge'
 import SellAccessGate from '../components/common/SellAccessGate'
+import ConfirmModal from '../components/common/ConfirmModal'
 import VehicleImagesManager from '../components/dashboard/VehicleImagesManager'
 import VehicleSpecsManager from '../components/dashboard/VehicleSpecsManager'
 import VehicleFeaturesManager from '../components/dashboard/VehicleFeaturesManager'
@@ -34,6 +35,7 @@ import {
 } from '../services/vehicleListingService'
 
 const DEDICATED_ROUTES = {
+  cars: '/sell/cars',
   electronics: '/sell/electronics',
   'spare-parts': '/sell/spare-parts',
   properties: '/sell/properties',
@@ -122,8 +124,18 @@ export default function SellProduct() {
     fetchListings().catch(() => { })
   }, [fetchListings])
 
+  const { slug } = useParams()
+
   // View state: 'create' or 'listings'
-  const [viewMode, setViewMode] = useState('create')
+  const initialMode = (location.pathname.endsWith('add-vehicle') || slug) ? 'create' : (searchParams.get('mode') || 'listings')
+  const [viewMode, setViewModeState] = useState(initialMode)
+
+  const setViewMode = (mode) => {
+    setViewModeState(mode)
+    if (mode === 'listings') {
+      navigate('/sell/cars')
+    }
+  }
 
   // Step tabs inside creation flow: 'details', 'images', 'specifications', 'features', 'documents'
   const [activeStep, setActiveStep] = useState('details')
@@ -132,6 +144,48 @@ export default function SellProduct() {
   // Once details are saved via "Save Changes", createdSlug is set
   const [createdSlug, setCreatedSlug] = useState(null)
   const [createdVehicle, setCreatedVehicle] = useState(null)
+
+  useEffect(() => {
+    if (slug && createdSlug !== slug) {
+      const loadVehicle = async () => {
+        try {
+          const res = await vehicleListingService.getMyListing(slug)
+          const v = res?.data || res
+          if (v) {
+            setCreatedSlug(v.slug || v.id)
+            setCreatedVehicle(v)
+            setForm({
+              brand: v.brand || 'MARUTI_SUZUKI',
+              model: v.model || '',
+              variant: v.variant || '',
+              year: v.year || new Date().getFullYear(),
+              price: v.price || '',
+              mileage: v.mileage || '',
+              condition: v.condition || 'USED',
+              fuelType: v.fuelType || 'PETROL',
+              transmissionType: v.transmissionType || 'MANUAL',
+              color: v.color || '',
+              registrationNumber: v.registrationNumber || '',
+              chassisNumber: v.chassisNumber || '',
+              vin: v.vin || '',
+              vehicleType: v.vehicleType || 'CARS',
+              ownersCount: v.ownersCount || '1',
+              description: v.description || '',
+              sellerName: v.seller?.sellerName || user?.name || '',
+              sellerPhone: v.seller?.mobileNumber || user?.phone || '',
+              location: '',
+              city: '',
+            })
+            setViewModeState('create')
+          }
+        } catch (err) {
+          console.error('Failed to load vehicle details by slug:', err)
+        }
+      }
+      loadVehicle()
+    }
+  }, [slug, createdSlug, user])
+
   const [savingDetails, setSavingDetails] = useState(false)
   const [savingAction, setSavingAction] = useState(false)
   const [apiSuccessMsg, setApiSuccessMsg] = useState(null)
@@ -140,7 +194,7 @@ export default function SellProduct() {
   // Modals for manage actions from listings table
   const [modalSlug, setModalSlug] = useState(null)
   const [modalType, setModalType] = useState(null) // 'images' | 'specs' | 'features' | 'docs'
-  const [deletingSlug, setDeletingSlug] = useState(null)
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: '', slug: '', processing: false })
 
   const updateField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
 
@@ -179,9 +233,13 @@ export default function SellProduct() {
       await fetchListings()
     } catch (err) {
       console.error('Failed to save vehicle details:', err)
-      const msg = err?.response?.data?.message || err?.message || 'Failed to save vehicle details.'
+      let msg = err?.response?.data?.message || err?.message || 'Failed to save vehicle details.'
+      if (err?.response?.data?.errors) {
+        const fieldErrors = Object.values(err.response.data.errors).join(', ')
+        if (fieldErrors) msg += ` - ${fieldErrors}`
+      }
       setApiErrorMsg(msg)
-    } fontFinally: {
+    } finally {
       setSavingDetails(false)
     }
   }
@@ -206,7 +264,11 @@ export default function SellProduct() {
         setViewMode('listings')
       }, 1200)
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Failed to save draft.'
+      let msg = err?.response?.data?.message || err?.message || 'Failed to save draft.'
+      if (err?.response?.data?.errors) {
+        const fieldErrors = Object.values(err.response.data.errors).join(', ')
+        if (fieldErrors) msg += ` - ${fieldErrors}`
+      }
       setApiErrorMsg(msg)
     } finally {
       setSavingAction(false)
@@ -241,7 +303,11 @@ export default function SellProduct() {
         setViewMode('listings')
       }, 1500)
     } catch (err) {
-      const msg = err?.response?.data?.message || err?.message || 'Failed to submit vehicle for verification.'
+      let msg = err?.response?.data?.message || err?.message || 'Failed to submit vehicle for verification.'
+      if (err?.response?.data?.errors) {
+        const fieldErrors = Object.values(err.response.data.errors).join(', ')
+        if (fieldErrors) msg += ` - ${fieldErrors}`
+      }
       setApiErrorMsg(msg)
       if (msg.toLowerCase().includes('image') || msg.toLowerCase().includes('photo')) {
         setActiveStep('images')
@@ -278,7 +344,8 @@ export default function SellProduct() {
       city: '',
     })
     setActiveStep('details')
-    setViewMode('create')
+    setViewModeState('create')
+    navigate(`/sell/cars/${v.slug}`)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -290,18 +357,36 @@ export default function SellProduct() {
     setActiveStep('details')
     setApiErrorMsg(null)
     setApiSuccessMsg(null)
-    setViewMode('create')
+    setViewModeState('create')
+    navigate('/sell/cars/add-vehicle')
   }
 
-  const handleDeleteVehicleCard = async (slug) => {
-    if (!window.confirm('Are you sure you want to delete this vehicle listing?')) return
-    setDeletingSlug(slug)
+  const requestAction = (type, slug) => {
+    setConfirmModal({ isOpen: true, type, slug, processing: false })
+  }
+
+  const executeAction = async () => {
+    const { type, slug } = confirmModal
+    setConfirmModal(prev => ({ ...prev, processing: true }))
     try {
-      await deleteListing(slug)
+      if (type === 'delete') {
+        await deleteListing(slug)
+        setApiSuccessMsg('Vehicle listing deleted successfully!')
+      } else if (type === 'archive') {
+        await archiveListing(slug)
+        setApiSuccessMsg('Vehicle listing archived!')
+      } else if (type === 'restore') {
+        await restoreListing(slug)
+        setApiSuccessMsg('Vehicle listing restored successfully!')
+      } else if (type === 'submit') {
+        await submitListing(slug)
+        setApiSuccessMsg('Vehicle listing submitted for verification!')
+      }
+      setConfirmModal({ isOpen: false, type: '', slug: '', processing: false })
+      await fetchListings()
     } catch (err) {
-      alert(`Failed to delete listing: ${err?.response?.data?.message || err?.message}`)
-    } finally {
-      setDeletingSlug(null)
+      alert(`Failed to perform action: ${err?.response?.data?.message || err?.message}`)
+      setConfirmModal(prev => ({ ...prev, processing: false }))
     }
   }
 
@@ -324,46 +409,28 @@ export default function SellProduct() {
 
   return (
     <div className="container-page py-8">
-      <Breadcrumb items={[{ label: 'Vehicle Listings' }]} />
+      <Breadcrumb items={[{ label: 'Sell' }, { label: 'Vehicle Listings' }]} />
 
       {/* Top Header Mode Toggle & Actions */}
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-border pb-6">
         <div>
-          <h1 className="text-2xl font-extrabold text-text sm:text-3xl">Vehicle Management &amp; Selling</h1>
+          <h1 className="text-2xl font-extrabold text-text sm:text-3xl">Vehicle Listings</h1>
           <p className="mt-1 text-sm text-text-secondary">
-            Create vehicle listings, manage images, specifications, features &amp; documents, and send for verification.
+            Manage your vehicle inventory, pricing, specifications, archive/restore status, and verification.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex rounded-xl border border-border bg-surface-alt p-1">
-            <button
-              type="button"
-              onClick={() => setViewMode('create')}
-              className={cn(
-                'flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-colors',
-                viewMode === 'create' ? 'bg-surface text-primary shadow-soft' : 'text-text-secondary hover:text-text'
-              )}
-            >
-              <Plus size={14} /> Create Vehicle
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                fetchListings()
-                setViewMode('listings')
-              }}
-              className={cn(
-                'flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-xs font-bold transition-colors',
-                viewMode === 'listings' ? 'bg-surface text-primary shadow-soft' : 'text-text-secondary hover:text-text'
-              )}
-            >
-              <CarFront size={14} /> My Vehicle Listings ({userVehicleListings.length})
-            </button>
-          </div>
-
-          <Button variant="primary" icon={CarFront} onClick={handleStartNewVehicle}>
-            Sell Vehicle
+          {viewMode === 'create' || viewMode === 'edit' || viewMode === 'new' ? (
+            <Button variant="outline" icon={CarFront} onClick={() => {
+              fetchListings()
+              setViewMode('listings')
+            }}>
+              View Listings
+            </Button>
+          ) : null}
+          <Button variant="primary" icon={Plus} onClick={handleStartNewVehicle}>
+            Add Vehicle
           </Button>
         </div>
       </div>
@@ -434,11 +501,6 @@ export default function SellProduct() {
                   <h2 className="text-xl font-bold text-text">Enter Vehicle Details</h2>
                   <p className="mt-1 text-xs text-text-secondary">Provide accurate vehicle details according to official registration records.</p>
                 </div>
-                {createdSlug && (
-                  <span className="rounded-full bg-success/10 px-3 py-1 font-mono text-xs font-bold text-success">
-                    Listing Saved (Slug: {createdSlug})
-                  </span>
-                )}
               </div>
 
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -555,7 +617,7 @@ export default function SellProduct() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-5">
                 <Input
                   label="VIN (Vehicle Identification Number)"
                   placeholder="VIN Number"
@@ -563,18 +625,6 @@ export default function SellProduct() {
                   onChange={(e) => updateField('vin', e.target.value)}
                   maxLength={100}
                 />
-                <div className="grid grid-cols-2 gap-3">
-                  <Input
-                    label="Seller Name"
-                    value={form.sellerName}
-                    onChange={(e) => updateField('sellerName', e.target.value)}
-                  />
-                  <Input
-                    label="Seller Phone"
-                    value={form.sellerPhone}
-                    onChange={(e) => updateField('sellerPhone', e.target.value)}
-                  />
-                </div>
               </div>
 
               <TextArea
@@ -682,32 +732,7 @@ export default function SellProduct() {
       {/* MODE 2: GET ALL LISTINGS VIEW */}
       {viewMode === 'listings' && (
         <div>
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-surface p-5 shadow-soft">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary font-bold">
-                {userVehicleListings.length}
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-text">Your Vehicle Listings</h2>
-                <p className="text-xs text-text-secondary">All vehicles created and submitted for verification</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => fetchListings()}
-                disabled={listingsLoading}
-                className="flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-2 text-xs font-semibold text-text hover:bg-surface-alt"
-              >
-                <RefreshCw size={14} className={cn(listingsLoading && 'animate-spin')} /> Refresh
-              </button>
-
-              <Button variant="primary" icon={Plus} onClick={handleStartNewVehicle}>
-                Sell Vehicle
-              </Button>
-            </div>
-          </div>
+          {/* We removed the redundant inner header because it is now shown at the top of the page */}
 
           {userVehicleListings.length === 0 && !listingsLoading ? (
             <div className="rounded-2xl border border-dashed border-border py-16 text-center shadow-soft">
@@ -715,7 +740,7 @@ export default function SellProduct() {
               <h3 className="text-base font-bold text-text">No vehicle listings found</h3>
               <p className="mt-1 text-xs text-text-secondary">Start listing your cars or commercial vehicles to reach buyers across SwipeDeals.</p>
               <Button variant="primary" className="mt-6" icon={Plus} onClick={handleStartNewVehicle}>
-                Sell Vehicle
+                Add Vehicle
               </Button>
             </div>
           ) : (
@@ -804,133 +829,121 @@ export default function SellProduct() {
                           <p className="line-clamp-2 text-xs text-text-secondary">{v.description}</p>
                         )}
 
-                        {/* Sub-item Count Badges */}
-                        <div className="flex flex-wrap items-center gap-2 pt-1">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 font-mono text-[11px] font-bold text-primary">
-                            <ImagePlus size={12} /> {imagesCount} Images
-                          </span>
-                          <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 font-mono text-[11px] font-bold text-success">
-                            <FileCheck size={12} /> {docsCount} Docs
-                          </span>
-                          <span className="inline-flex items-center gap-1 rounded-full bg-info/10 px-2.5 py-1 font-mono text-[11px] font-bold text-info">
-                            <Sliders size={12} /> {specsCount} Specs
-                          </span>
-                          <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-2.5 py-1 font-mono text-[11px] font-bold text-warning">
-                            <Sparkles size={12} /> {featuresCount} Features
-                          </span>
-                        </div>
                       </div>
                     </div>
 
                     {/* Card Actions Footer */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-surface-alt/40 px-6 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          icon={ImagePlus}
-                          onClick={() => {
-                            setModalSlug(v.slug)
-                            setModalType('images')
-                          }}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 bg-surface-alt/40 px-5 py-3.5">
+                      {/* Left group: management tabs */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          className="group inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition-all hover:bg-primary/10 hover:shadow-xs active:scale-95"
+                          onClick={() => { setModalSlug(v.slug); setModalType('images') }}
+                          title="Manage Photos"
                         >
-                          Photos ({imagesCount})
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          icon={Sliders}
-                          onClick={() => {
-                            setModalSlug(v.slug)
-                            setModalType('specs')
-                          }}
+                          <ImagePlus size={14} className="text-primary" />
+                          <span>Photos</span>
+                          <span className="rounded-md bg-primary/20 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                            {imagesCount}
+                          </span>
+                        </button>
+
+                        <button
+                          className="group inline-flex items-center gap-1.5 rounded-lg border border-info/20 bg-info/5 px-3 py-1.5 text-xs font-semibold text-info transition-all hover:bg-info/10 hover:shadow-xs active:scale-95"
+                          onClick={() => { setModalSlug(v.slug); setModalType('specs') }}
+                          title="Manage Specs"
                         >
-                          Specs ({specsCount})
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          icon={Sparkles}
-                          onClick={() => {
-                            setModalSlug(v.slug)
-                            setModalType('features')
-                          }}
+                          <Sliders size={14} className="text-info" />
+                          <span>Specs</span>
+                          <span className="rounded-md bg-info/20 px-1.5 py-0.5 text-[10px] font-bold text-info">
+                            {specsCount}
+                          </span>
+                        </button>
+
+                        <button
+                          className="group inline-flex items-center gap-1.5 rounded-lg border border-warning/20 bg-warning/5 px-3 py-1.5 text-xs font-semibold text-warning transition-all hover:bg-warning/10 hover:shadow-xs active:scale-95"
+                          onClick={() => { setModalSlug(v.slug); setModalType('features') }}
+                          title="Manage Features"
                         >
-                          Features ({featuresCount})
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          icon={FileCheck}
-                          onClick={() => {
-                            setModalSlug(v.slug)
-                            setModalType('docs')
-                          }}
+                          <Sparkles size={14} className="text-warning" />
+                          <span>Features</span>
+                          <span className="rounded-md bg-warning/20 px-1.5 py-0.5 text-[10px] font-bold text-warning">
+                            {featuresCount}
+                          </span>
+                        </button>
+
+                        <button
+                          className="group inline-flex items-center gap-1.5 rounded-lg border border-success/20 bg-success/5 px-3 py-1.5 text-xs font-semibold text-success transition-all hover:bg-success/10 hover:shadow-xs active:scale-95"
+                          onClick={() => { setModalSlug(v.slug); setModalType('docs') }}
+                          title="Manage Documents"
                         >
-                          Docs ({docsCount})
-                        </Button>
+                          <FileCheck size={14} className="text-success" />
+                          <span>Docs</span>
+                          <span className="rounded-md bg-success/20 px-1.5 py-0.5 text-[10px] font-bold text-success">
+                            {docsCount}
+                          </span>
+                        </button>
                       </div>
 
+                      {/* Right group: primary item actions */}
                       <div className="flex flex-wrap items-center gap-2">
                         {v.status === 'DRAFT' && (
-                          <Button
-                            size="xs"
-                            variant="primary"
-                            icon={Rocket}
-                            onClick={() => {
-                              if (window.confirm('Submit this vehicle for verification?')) {
-                                submitListing(v.slug)
-                              }
-                            }}
+                          <button
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-1.5 text-xs font-bold text-white shadow-xs transition-all hover:bg-primary/90 hover:shadow-md active:scale-95"
+                            onClick={() => requestAction('submit', v.slug)}
                           >
-                            Send for Verification
-                          </Button>
+                            <Rocket size={13} />
+                            <span>Send for Verification</span>
+                          </button>
                         )}
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          icon={Pencil}
+
+                        <Link
+                          to={`/cars/${v.slug || v.id}?from=sell`}
+                          state={{ from: '/sell/cars' }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text-secondary shadow-xs transition-all hover:border-primary/40 hover:bg-surface-alt hover:text-primary active:scale-95"
+                          title="View Details"
+                        >
+                          <Eye size={14} />
+                          <span>View Details</span>
+                        </Link>
+
+                        <button
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text-secondary shadow-xs transition-all hover:border-primary/40 hover:bg-primary/5 hover:text-primary active:scale-95"
                           onClick={() => handleEditVehicleCard(v)}
+                          title="Edit Details"
                         >
-                          Edit Details
-                        </Button>
+                          <Pencil size={14} />
+                          <span>Edit Details</span>
+                        </button>
+
                         {v.status === 'ARCHIVED' ? (
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            icon={RefreshCw}
-                            onClick={() => {
-                              if (window.confirm('Restore this archived vehicle listing?')) {
-                                restoreListing(v.slug)
-                              }
-                            }}
+                          <button
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-success/30 bg-success/10 px-3 py-1.5 text-xs font-semibold text-success shadow-xs transition-all hover:bg-success/20 active:scale-95"
+                            onClick={() => requestAction('restore', v.slug)}
+                            title="Restore Listing"
                           >
-                            Restore
-                          </Button>
+                            <RefreshCw size={14} />
+                            <span>Restore</span>
+                          </button>
                         ) : (
-                          <Button
-                            size="xs"
-                            variant="outline"
-                            className="text-text-secondary"
-                            onClick={() => {
-                              if (window.confirm('Archive this vehicle listing?')) {
-                                archiveListing(v.slug)
-                              }
-                            }}
+                          <button
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text-secondary shadow-xs transition-all hover:border-amber-400/40 hover:bg-amber-500/10 hover:text-amber-600 active:scale-95"
+                            onClick={() => requestAction('archive', v.slug)}
+                            title="Archive Listing"
                           >
-                            Archive
-                          </Button>
+                            <Archive size={14} />
+                            <span>Archive</span>
+                          </button>
                         )}
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          icon={Trash2}
-                          className="border-danger/30 text-danger hover:bg-danger/10"
-                          disabled={deletingSlug === v.slug}
-                          onClick={() => handleDeleteVehicleCard(v.slug)}
+
+                        <button
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-danger/30 bg-danger/5 px-3 py-1.5 text-xs font-semibold text-danger shadow-xs transition-all hover:bg-danger/10 active:scale-95"
+                          onClick={() => requestAction('delete', v.slug)}
+                          title="Delete Listing"
                         >
-                          {deletingSlug === v.slug ? 'Deleting...' : 'Delete'}
-                        </Button>
+                          <Trash2 size={14} />
+                          <span>Delete</span>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -954,6 +967,32 @@ export default function SellProduct() {
       {modalSlug && modalType === 'docs' && (
         <VehicleDocumentsManager slug={modalSlug} onClose={() => { setModalSlug(null); setModalType(null); fetchListings(); }} />
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        isLoading={confirmModal.processing}
+        onClose={() => setConfirmModal({ isOpen: false, type: '', slug: '', processing: false })}
+        onConfirm={executeAction}
+        title={
+          confirmModal.type === 'delete' ? 'Delete Vehicle Listing' :
+            confirmModal.type === 'archive' ? 'Archive Vehicle Listing' :
+              confirmModal.type === 'submit' ? 'Submit for Verification' :
+                'Restore Vehicle Listing'
+        }
+        message={
+          confirmModal.type === 'delete' ? 'Are you sure you want to permanently delete this vehicle listing? This action cannot be undone.' :
+            confirmModal.type === 'archive' ? 'Are you sure you want to archive this vehicle? It will be hidden from public view.' :
+              confirmModal.type === 'submit' ? 'Are you sure you want to submit this vehicle for verification? Our team will review the details before making it public.' :
+                'Are you sure you want to restore this vehicle listing to active status?'
+        }
+        confirmText={
+          confirmModal.type === 'delete' ? 'Delete' :
+            confirmModal.type === 'archive' ? 'Archive' :
+              confirmModal.type === 'submit' ? 'Submit' :
+                'Restore'
+        }
+        variant={confirmModal.type === 'delete' ? 'danger' : confirmModal.type === 'archive' ? 'warning' : 'primary'}
+      />
     </div>
   )
 }

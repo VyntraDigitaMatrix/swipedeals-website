@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FileCheck, FileText, Plus, RefreshCw, Trash2, Upload, X } from 'lucide-react'
+import { FileCheck, FileText, Pencil, Plus, RefreshCw, Trash2, Upload, X } from 'lucide-react'
 import Button from '../buttons/Button'
 import Dropdown from '../forms/Dropdown'
 import { useVehicleDocuments } from '../../hooks/useVehicleDocuments'
@@ -10,6 +10,9 @@ export default function VehicleDocumentsManager({ slug, onClose }) {
   const [selectedType, setSelectedType] = useState('RC')
   const [selectedFile, setSelectedFile] = useState(null)
   const [uploading, setUploading] = useState(false)
+  const [replacingDoc, setReplacingDoc] = useState(null) // { documentType, label }
+  const [replaceFile, setReplaceFile] = useState(null)
+  const [replacing, setReplacing] = useState(false)
 
   useEffect(() => {
     if (slug) {
@@ -46,6 +49,25 @@ export default function VehicleDocumentsManager({ slug, onClose }) {
       await deleteDocument(docId)
     } catch (err) {
       alert(err?.response?.data?.message || err?.message || 'Failed to delete vehicle document.')
+    }
+  }
+
+  const handleReplaceSubmit = async (e) => {
+    e.preventDefault()
+    if (!replaceFile) {
+      alert('Please select a file to replace the document.')
+      return
+    }
+    setReplacing(true)
+    try {
+      await replaceDocument(replacingDoc.documentType, replaceFile)
+      setReplacingDoc(null)
+      setReplaceFile(null)
+      alert(`Document (${replacingDoc.label}) replaced successfully!`)
+    } catch (err) {
+      alert(err?.response?.data?.message || err?.message || 'Failed to replace document.')
+    } finally {
+      setReplacing(false)
     }
   }
 
@@ -104,39 +126,83 @@ export default function VehicleDocumentsManager({ slug, onClose }) {
           <div className="space-y-3">
             {documents.map((doc) => {
               const label = DOCUMENT_TYPES.find((d) => d.value === doc.documentType)?.label || doc.documentType
+              const isReplacing = replacingDoc?.documentType === doc.documentType
               return (
-                <div key={doc.id} className="flex items-center justify-between rounded-xl border border-border bg-surface p-4 shadow-soft">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <FileCheck size={20} />
+                <div key={doc.id} className="rounded-xl border border-border bg-surface p-4 shadow-soft">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <FileCheck size={20} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-text">{label}</p>
+                        <p className="text-xs text-text-secondary">
+                          {doc.originalFileName || 'Document File'} {doc.fileSize ? `(${Math.round(doc.fileSize / 1024)} KB)` : ''}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-text">{label}</p>
-                      <p className="text-xs text-text-secondary">
-                        {doc.originalFileName || 'Document File'} {doc.fileSize ? `(${Math.round(doc.fileSize / 1024)} KB)` : ''}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {doc.documentUrl && (
-                      <a
-                        href={doc.documentUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-primary hover:bg-surface-alt"
+                    <div className="flex items-center gap-2">
+                      {doc.documentUrl && (
+                        <a
+                          href={doc.documentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-primary hover:bg-surface-alt"
+                        >
+                          View
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReplacingDoc({ documentType: doc.documentType, label })
+                          setReplaceFile(null)
+                        }}
+                        className="rounded-lg p-2 text-primary hover:bg-primary/10"
+                        title="Replace Document"
                       >
-                        View File
-                      </a>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(doc.id, label)}
-                      className="rounded-lg p-2 text-danger hover:bg-danger/10"
-                      title="Delete Document"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(doc.id, label)}
+                        className="rounded-lg p-2 text-danger hover:bg-danger/10"
+                        title="Delete Document"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
+
+                  {isReplacing && (
+                    <form onSubmit={handleReplaceSubmit} className="mt-3 flex flex-col gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
+                      <p className="text-xs font-semibold text-primary">Replace {label}</p>
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <input
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg"
+                          onChange={(e) => setReplaceFile(e.target.files?.[0] || null)}
+                          className="flex-1 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-text"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { setReplacingDoc(null); setReplaceFile(null) }}
+                            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-text-secondary hover:bg-surface-alt"
+                          >
+                            Cancel
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={replacing || !replaceFile}
+                            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary/90 disabled:opacity-50"
+                          >
+                            {replacing ? 'Replacing...' : 'Replace'}
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  )}
                 </div>
               )
             })}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useLocation, useSearchParams } from 'react-router-dom'
 import { Calendar, Clock, FileText, Fuel, Gauge, Hash, Palette, Settings2, Shield, Users } from 'lucide-react'
 import DetailLayout from '../components/listing/DetailLayout'
 import Carousel from '../components/common/Carousel'
@@ -9,11 +9,15 @@ import EmptyState from '../components/common/EmptyState'
 import { vehicleService, mapVehicleToCarCard, extractImages } from '../services/publicListingService'
 import { vehicleListingService } from '../services/vehicleListingService'
 import { usePublicImages } from '../hooks/usePublicImages'
+import { useAuth } from '../hooks/useAuth'
 import { PLACEHOLDER_IMAGE } from '../utils/enumFormat'
 import { formatCurrencyFull, formatDate } from '../utils/format'
 
 export default function CarDetails() {
   const { id: slug } = useParams()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const { user } = useAuth()
 
   const [raw, setRaw] = useState(null)
   const [similarRaw, setSimilarRaw] = useState([])
@@ -71,7 +75,7 @@ export default function CarDetails() {
     if (!raw) return
     let cancelled = false
     vehicleService
-      .getAll({ type: raw.vehicleType, size: 7, sort: 'createdAt,desc' })
+      .getAll({ vehicleType: raw.vehicleType || 'CARS', size: 7, sort: 'createdAt,desc' })
       .then((res) => {
         if (cancelled) return
         const content = res?.data?.content
@@ -101,6 +105,7 @@ export default function CarDetails() {
   const mapped = mapVehicleToCarCard(raw)
   const car = {
     ...mapped,
+    productType: 'VEHICLE',
     slug: mapped?.slug || raw?.slug || slug,
     id: mapped?.id || raw?.id || slug,
     images: images.length > 0 && images[0] !== PLACEHOLDER_IMAGE ? images : carImages,
@@ -135,11 +140,23 @@ export default function CarDetails() {
     { label: 'Updated At', value: formatDate(raw.updatedAt), icon: Clock },
   ].filter((s) => s.value !== null && s.value !== undefined && s.value !== '')
 
+  const isFromSell =
+    location.state?.from === '/sell/cars' ||
+    location.state?.from?.startsWith('/sell') ||
+    searchParams.get('from') === 'sell' ||
+    searchParams.get('source') === 'sell' ||
+    raw?.status === 'DRAFT' ||
+    raw?.status === 'PENDING_APPROVAL' ||
+    raw?.status === 'UNDER_REVIEW' ||
+    Boolean(user?.id && raw?.seller?.sellerId && String(raw?.seller?.sellerId) === String(user?.id))
+
+  const breadcrumbTo = isFromSell ? '/sell/cars' : '/cars'
+
   return (
     <DetailLayout
       item={car}
       breadcrumbLabel="Cars"
-      breadcrumbTo="/cars"
+      breadcrumbTo={breadcrumbTo}
       badges={[
         {
           label: car.condition === 'new' ? 'New' : car.condition === 'like-new' ? 'Like New' : 'Used',
@@ -168,6 +185,40 @@ export default function CarDetails() {
         )
       }
       belowContact={<LoanCalculator price={car.price} />}
-    />
+    >
+      {(raw.vehicleFeatureResponses?.length > 0 || raw.vehicleSpecificationResponses?.length > 0) && (
+        <div className="mt-10 space-y-10">
+          {raw.vehicleFeatureResponses?.length > 0 && (
+            <div>
+              <h2 className="mb-4 text-xl font-extrabold text-text">Key Features</h2>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+                {raw.vehicleFeatureResponses.map((f, i) => (
+                  <div key={i} className="flex items-start gap-2.5">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    </span>
+                    <span className="text-sm font-medium text-text-secondary">{f.featureName}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {raw.vehicleSpecificationResponses?.length > 0 && (
+            <div>
+              <h2 className="mb-4 text-xl font-extrabold text-text">Technical Specifications</h2>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+                {raw.vehicleSpecificationResponses.map((s, i) => (
+                  <div key={i} className="border-b border-border pb-2">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-text-light">{s.specKey}</p>
+                    <p className="mt-1 text-sm font-semibold text-text">{s.specValue}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </DetailLayout>
   )
 }

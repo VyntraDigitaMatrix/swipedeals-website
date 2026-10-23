@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useLocation, useSearchParams } from 'react-router-dom'
 import { Bath, BedDouble, Building2, Clock, Compass, Home, Layers, MapPin, Ruler } from 'lucide-react'
 import DetailLayout from '../components/listing/DetailLayout'
 import PropertyCard from '../components/property/PropertyCard'
@@ -7,11 +7,15 @@ import EmptyState from '../components/common/EmptyState'
 import { propertyService, mapPropertyToCard, extractImages } from '../services/publicListingService'
 import { propertyListingService } from '../services/propertyListingService'
 import { usePublicImages } from '../hooks/usePublicImages'
+import { useAuth } from '../hooks/useAuth'
 import { PLACEHOLDER_IMAGE, titleCaseEnum } from '../utils/enumFormat'
 import { formatCurrencyFull, formatDate } from '../utils/format'
 
 export default function PropertyDetails() {
   const { id: slug } = useParams()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const { user } = useAuth()
 
   const [raw, setRaw] = useState(null)
   const [similarRaw, setSimilarRaw] = useState([])
@@ -97,6 +101,7 @@ export default function PropertyDetails() {
   const mapped = mapPropertyToCard(raw)
   const property = {
     ...mapped,
+    productType: 'PROPERTY',
     slug: mapped?.slug || raw?.slug || slug,
     id: mapped?.id || raw?.id || slug,
     images: images.length > 0 && images[0] !== PLACEHOLDER_IMAGE ? images : propImages,
@@ -133,18 +138,30 @@ export default function PropertyDetails() {
     { label: 'Age of Property', value: raw.ageOfProperty != null ? `${raw.ageOfProperty} Year${raw.ageOfProperty > 1 ? 's' : ''}` : null },
     { label: 'City', value: raw.city, icon: MapPin },
     { label: 'Locality', value: raw.locality, icon: MapPin },
+    { label: 'Address', value: raw.address, icon: MapPin },
     { label: 'Pincode', value: raw.pincode },
     { label: 'Source', value: raw.listingSource ? titleCaseEnum(raw.listingSource) : null },
     { label: 'Status', value: raw.status ? titleCaseEnum(raw.status) : null },
-    { label: 'Created At', value: formatDate(raw.createdAt), icon: Clock },
-    { label: 'Updated At', value: formatDate(raw.updatedAt), icon: Clock },
+    { label: 'Rejection Reason', value: raw.rejectionReason },
   ].filter((s) => s.value !== null && s.value !== undefined && s.value !== '')
+
+  const isFromSell =
+    location.state?.from === '/sell/properties' ||
+    location.state?.from?.startsWith('/sell') ||
+    searchParams.get('from') === 'sell' ||
+    searchParams.get('source') === 'sell' ||
+    raw?.status === 'DRAFT' ||
+    raw?.status === 'PENDING_APPROVAL' ||
+    raw?.status === 'UNDER_REVIEW' ||
+    Boolean(user?.id && raw?.seller?.sellerId && String(raw?.seller?.sellerId) === String(user?.id))
+
+  const breadcrumbTo = isFromSell ? '/sell/properties' : '/properties'
 
   return (
     <DetailLayout
       item={property}
       breadcrumbLabel="Properties"
-      breadcrumbTo="/properties"
+      breadcrumbTo={breadcrumbTo}
       badges={[
         { label: `For ${property.purpose}`, variant: property.purpose === 'Rent' ? 'warning' : 'success' },
         { label: property.type, variant: 'neutral' },

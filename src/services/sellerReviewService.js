@@ -6,6 +6,22 @@ import { toUuid } from '../utils/uuid'
  */
 export const sellerReviewService = {
   /**
+   * GET /api/reviews/my-reviews
+   * Retrieves paginated reviews received by the currently authenticated seller.
+   */
+  getMyReviews: async (params = {}) => {
+    try {
+      const res = await api.get('/api/reviews/my-reviews', { params })
+      return res.data
+    } catch (err) {
+      if (err?.response?.status === 404 || err?.response?.status === 400) {
+        return { success: true, data: { content: [], totalElements: 0, totalPages: 0 } }
+      }
+      throw err
+    }
+  },
+
+  /**
    * POST /api/reviews
    * Submits a new review for a seller.
    * Body: { sellerId: string, rating: number, review: string }

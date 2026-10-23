@@ -145,7 +145,8 @@ export const propertyListingService = {
    */
   uploadImages: async (slug, files) => {
     const formData = new FormData()
-    files.forEach((file) => formData.append('files', file))
+    const fileList = Array.isArray(files) ? files : [files]
+    fileList.forEach((file) => formData.append('files', file))
     const res = await api.post(`/api/user/products/properties/${encodeURIComponent(slug)}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
@@ -159,9 +160,13 @@ export const propertyListingService = {
   updateImage: async (slug, imageId, file) => {
     const formData = new FormData()
     formData.append('file', file)
-    const res = await api.put(`/api/user/products/properties/${encodeURIComponent(slug)}/images/${imageId}`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const res = await api.put(
+      `/api/user/products/properties/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }
+    )
     return res.data
   },
 
@@ -170,7 +175,9 @@ export const propertyListingService = {
    * Delete a specific property image.
    */
   deleteImage: async (slug, imageId) => {
-    const res = await api.delete(`/api/user/products/properties/${encodeURIComponent(slug)}/images/${imageId}`)
+    const res = await api.delete(
+      `/api/user/products/properties/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}`
+    )
     return res.data
   },
 
@@ -179,7 +186,9 @@ export const propertyListingService = {
    * Set an image as primary.
    */
   setPrimaryImage: async (slug, imageId) => {
-    const res = await api.patch(`/api/user/products/properties/${encodeURIComponent(slug)}/images/${imageId}/primary`)
+    const res = await api.patch(
+      `/api/user/products/properties/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}/primary`
+    )
     return res.data
   },
 
@@ -187,17 +196,27 @@ export const propertyListingService = {
    * PATCH /api/user/products/properties/{slug}/images/{imageId}/order
    * Update the display order of an image.
    */
-  reorderImage: async (slug, imageId, displayOrder) => {
-    const res = await api.patch(`/api/user/products/properties/${encodeURIComponent(slug)}/images/${imageId}/order`, { displayOrder })
+  updateImageOrder: async (slug, imageId, displayOrder) => {
+    const res = await api.patch(
+      `/api/user/products/properties/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}/order`,
+      { displayOrder: parseInt(displayOrder, 10) }
+    )
     return res.data
+  },
+
+  /**
+   * Alias for updateImageOrder.
+   */
+  reorderImage: async (slug, imageId, displayOrder) => {
+    return propertyListingService.updateImageOrder(slug, imageId, displayOrder)
   },
 
   /**
    * GET /api/user/products/properties/{slug}/images
    * Retrieve all images for a property listing.
    */
-  getImages: async (slug) => {
-    const res = await api.get(`/api/user/products/properties/${encodeURIComponent(slug)}/images`)
+  getImages: async (slug, params = {}) => {
+    const res = await api.get(`/api/user/products/properties/${encodeURIComponent(slug)}/images`, { params })
     return res.data
   },
 
@@ -211,5 +230,145 @@ export const propertyListingService = {
   },
 }
 
+/**
+ * Service specifically for User Property Images controller endpoints:
+ * (/api/user/products/properties/{slug}/**)
+ */
+export const userPropertyImageService = {
+  getImages: async (slug, params = {}) => {
+    const res = await api.get(`/api/user/products/properties/${encodeURIComponent(slug)}/images`, { params })
+    return res.data
+  },
+  getPrimaryImage: async (slug) => {
+    const res = await api.get(`/api/user/products/properties/${encodeURIComponent(slug)}/images/primary`)
+    return res.data
+  },
+  uploadImages: async (slug, files) => {
+    const formData = new FormData()
+    const fileList = Array.isArray(files) ? files : [files]
+    fileList.forEach((file) => formData.append('files', file))
+    const res = await api.post(`/api/user/products/properties/${encodeURIComponent(slug)}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return res.data
+  },
+  updateImage: async (slug, imageId, file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await api.put(
+      `/api/user/products/properties/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }
+    )
+    return res.data
+  },
+  deleteImage: async (slug, imageId) => {
+    const res = await api.delete(
+      `/api/user/products/properties/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}`
+    )
+    return res.data
+  },
+  setPrimaryImage: async (slug, imageId) => {
+    const res = await api.patch(
+      `/api/user/products/properties/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}/primary`
+    )
+    return res.data
+  },
+  updateImageOrder: async (slug, imageId, displayOrder) => {
+    const res = await api.patch(
+      `/api/user/products/properties/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}/order`,
+      { displayOrder: parseInt(displayOrder, 10) }
+    )
+    return res.data
+  },
+  reorderImage: async (slug, imageId, displayOrder) => {
+    return userPropertyImageService.updateImageOrder(slug, imageId, displayOrder)
+  },
+}
+
+/**
+ * Service specifically for Dealer Property Images controller endpoints:
+ * (/api/dealer/products/properties/{slug}/**)
+ */
+export const dealerPropertyImageService = {
+  getImages: async (slug, params = {}) => {
+    const res = await api.get(`/api/dealer/products/properties/${encodeURIComponent(slug)}/images`, { params })
+    return res.data
+  },
+  getPrimaryImage: async (slug) => {
+    const res = await api.get(`/api/dealer/products/properties/${encodeURIComponent(slug)}/images/primary`)
+    return res.data
+  },
+  uploadImages: async (slug, files) => {
+    const formData = new FormData()
+    const fileList = Array.isArray(files) ? files : [files]
+    fileList.forEach((file) => formData.append('files', file))
+    const res = await api.post(`/api/dealer/products/properties/${encodeURIComponent(slug)}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return res.data
+  },
+  updateImage: async (slug, imageId, file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await api.put(
+      `/api/dealer/products/properties/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }
+    )
+    return res.data
+  },
+  deleteImage: async (slug, imageId) => {
+    const res = await api.delete(
+      `/api/dealer/products/properties/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}`
+    )
+    return res.data
+  },
+  setPrimaryImage: async (slug, imageId) => {
+    const res = await api.patch(
+      `/api/dealer/products/properties/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}/primary`
+    )
+    return res.data
+  },
+  updateImageOrder: async (slug, imageId, displayOrder) => {
+    const res = await api.patch(
+      `/api/dealer/products/properties/${encodeURIComponent(slug)}/images/${encodeURIComponent(imageId)}/order`,
+      { displayOrder: parseInt(displayOrder, 10) }
+    )
+    return res.data
+  },
+  reorderImage: async (slug, imageId, displayOrder) => {
+    return dealerPropertyImageService.updateImageOrder(slug, imageId, displayOrder)
+  },
+}
+
+/**
+ * Unified Property Image Service that dispatches to either User or Dealer endpoints.
+ */
+export const propertyImageService = {
+  getService: (isDealer = false) => (isDealer ? dealerPropertyImageService : userPropertyImageService),
+  getImages: (slug, params = {}, isDealer = false) =>
+    (isDealer ? dealerPropertyImageService : userPropertyImageService).getImages(slug, params),
+  getPrimaryImage: (slug, isDealer = false) =>
+    (isDealer ? dealerPropertyImageService : userPropertyImageService).getPrimaryImage(slug),
+  uploadImages: (slug, files, isDealer = false) =>
+    (isDealer ? dealerPropertyImageService : userPropertyImageService).uploadImages(slug, files),
+  updateImage: (slug, imageId, file, isDealer = false) =>
+    (isDealer ? dealerPropertyImageService : userPropertyImageService).updateImage(slug, imageId, file),
+  deleteImage: (slug, imageId, isDealer = false) =>
+    (isDealer ? dealerPropertyImageService : userPropertyImageService).deleteImage(slug, imageId),
+  setPrimaryImage: (slug, imageId, isDealer = false) =>
+    (isDealer ? dealerPropertyImageService : userPropertyImageService).setPrimaryImage(slug, imageId),
+  updateImageOrder: (slug, imageId, displayOrder, isDealer = false) =>
+    (isDealer ? dealerPropertyImageService : userPropertyImageService).updateImageOrder(slug, imageId, displayOrder),
+  reorderImage: (slug, imageId, displayOrder, isDealer = false) =>
+    (isDealer ? dealerPropertyImageService : userPropertyImageService).updateImageOrder(slug, imageId, displayOrder),
+}
+
 export default propertyListingService
+
 

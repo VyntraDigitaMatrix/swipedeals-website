@@ -45,7 +45,7 @@ export function useChat(autoFetch = false) {
         : []
       setMessages(sortedMessages)
       // Mark as seen silently
-      chatService.markAsSeen(conversationId).catch(() => {})
+      chatService.markAsSeen(conversationId).catch(() => { })
     } catch {
       // Silently ignore poll errors to avoid spamming the UI
     }
@@ -63,7 +63,7 @@ export function useChat(autoFetch = false) {
         : []
       setMessages(sortedMessages)
       // Mark as seen silently
-      chatService.markAsSeen(conversationId).catch(() => {})
+      chatService.markAsSeen(conversationId).catch(() => { })
       return pageContent
     } catch (err) {
       if (err?.response?.status !== 401 && err?.response?.status !== 404) {
@@ -181,7 +181,7 @@ export function useChat(autoFetch = false) {
       chatService.getConversations().then((data) => {
         const list = Array.isArray(data) ? data : data?.data || data?.content || []
         setConversations(list)
-      }).catch(() => {})
+      }).catch(() => { })
     }, 10000)
 
     return () => clearInterval(intervalId)

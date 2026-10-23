@@ -4,12 +4,15 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 import { WishlistProvider } from './hooks/useWishlist'
+import { NotificationProvider } from './hooks/useNotifications'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <WishlistProvider>
-        <App />
+        <NotificationProvider>
+          <App />
+        </NotificationProvider>
       </WishlistProvider>
     </BrowserRouter>
   </StrictMode>,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useLocation, useSearchParams } from 'react-router-dom'
 import { Clock, Laptop, Package, ShieldCheck, Tag } from 'lucide-react'
 import DetailLayout from '../components/listing/DetailLayout'
 import ElectronicsCard from '../components/electronics/ElectronicsCard'
@@ -7,11 +7,15 @@ import EmptyState from '../components/common/EmptyState'
 import { electronicsService, mapElectronicsToCard, extractImages } from '../services/publicListingService'
 import { electronicsListingService } from '../services/electronicsListingService'
 import { usePublicImages } from '../hooks/usePublicImages'
+import { useAuth } from '../hooks/useAuth'
 import { PLACEHOLDER_IMAGE, titleCaseEnum } from '../utils/enumFormat'
 import { formatCurrencyFull, formatDate } from '../utils/format'
 
 export default function ElectronicsDetails() {
   const { id: slug } = useParams()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const { user } = useAuth()
 
   const [raw, setRaw] = useState(null)
   const [similarRaw, setSimilarRaw] = useState([])
@@ -97,6 +101,7 @@ export default function ElectronicsDetails() {
   const mapped = mapElectronicsToCard(raw)
   const item = {
     ...mapped,
+    productType: 'ELECTRONICS',
     images: images.length > 0 && images[0] !== PLACEHOLDER_IMAGE ? images : elecImages,
     location: '',
     sellerId: raw.seller?.sellerId || raw.sellerId || mapped.sellerId,
@@ -117,19 +122,31 @@ export default function ElectronicsDetails() {
     { label: 'Condition', value: raw.condition === 'NEW' ? 'New (Sealed)' : 'Used', icon: ShieldCheck },
     { label: 'Purchase Year', value: raw.purchaseYear },
     { label: 'Warranty', value: raw.warrantyAvailable != null ? (raw.warrantyAvailable ? 'Available' : 'No') : null },
+    { label: 'Original Bill', value: raw.billAvailable != null ? (raw.billAvailable ? 'Included' : 'Not Included') : null },
     { label: 'Original Box', value: raw.boxAvailable != null ? (raw.boxAvailable ? 'Included' : 'Not Included') : null },
     { label: 'Negotiable', value: raw.negotiable != null ? (raw.negotiable ? 'Yes' : 'No') : null },
     { label: 'Source', value: raw.listingSource ? titleCaseEnum(raw.listingSource) : null },
     { label: 'Status', value: raw.status ? titleCaseEnum(raw.status) : null },
-    { label: 'Created At', value: formatDate(raw.createdAt), icon: Clock },
-    { label: 'Updated At', value: formatDate(raw.updatedAt), icon: Clock },
+    { label: 'Rejection Reason', value: raw.rejectionReason },
   ].filter((s) => s.value !== null && s.value !== undefined && s.value !== '')
+
+  const isFromSell =
+    location.state?.from === '/sell/electronics' ||
+    location.state?.from?.startsWith('/sell') ||
+    searchParams.get('from') === 'sell' ||
+    searchParams.get('source') === 'sell' ||
+    raw?.status === 'DRAFT' ||
+    raw?.status === 'PENDING_APPROVAL' ||
+    raw?.status === 'UNDER_REVIEW' ||
+    Boolean(user?.id && raw?.seller?.sellerId && String(raw?.seller?.sellerId) === String(user?.id))
+
+  const breadcrumbTo = isFromSell ? '/sell/electronics' : '/electronics'
 
   return (
     <DetailLayout
       item={item}
       breadcrumbLabel="Electronics"
-      breadcrumbTo="/electronics"
+      breadcrumbTo={breadcrumbTo}
       badges={[
         { label: raw.condition === 'NEW' ? 'New' : 'Used', variant: raw.condition === 'NEW' ? 'success' : 'neutral' },
         ...(raw.type ? [{ label: titleCaseEnum(raw.type), variant: 'neutral' }] : []),

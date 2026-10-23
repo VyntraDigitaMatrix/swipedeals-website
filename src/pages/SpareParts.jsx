@@ -10,7 +10,7 @@ import SparePartCard from '../components/cards/SparePartCard'
 import CommunityListingsStrip from '../components/common/CommunityListingsStrip'
 import { sparePartsService, mapSparePartToCard } from '../services/publicListingService'
 
-const PAGE_SIZE = 8
+const PAGE_SIZE = 9
 
 export default function SpareParts() {
   const [searchParams] = useSearchParams()

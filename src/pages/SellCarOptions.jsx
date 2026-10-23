@@ -14,7 +14,7 @@ const OPTIONS = [
     description: 'List your car in minutes and connect directly with thousands of verified buyers — full control, your price, your timeline. Just like OLX.',
     features: ['Upload photos & set your own price', 'Chat directly with interested buyers', 'No commission on direct sales'],
     cta: 'Create Your Listing',
-    to: '/sell?category=cars',
+    to: '/sell/cars',
   },
   {
     id: 'dealer',

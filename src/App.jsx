@@ -29,14 +29,18 @@ import Pricing from './pages/Pricing'
 import ListingDetails from './pages/ListingDetails'
 import DealerStorefront from './pages/DealerStorefront'
 import ChallanPayment from './pages/ChallanPayment'
+import ChallanDetails from './pages/ChallanDetails'
 import VehicleInfo from './pages/VehicleInfo'
+import RcDetails from './pages/RcDetails'
 import Finance from './pages/Finance'
 import Insurance from './pages/Insurance'
 import Compare from './pages/Compare'
 import Wishlist from './pages/Wishlist'
+import Notifications from './pages/Notifications'
 import Profile from './pages/Profile'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import ForgotPassword from './pages/ForgotPassword'
 import About from './pages/About'
 import Contact from './pages/Contact'
 import FAQPage from './pages/FAQPage'
@@ -68,13 +72,22 @@ function App() {
         <Route path="/spare-parts/:id" element={<SparePartDetails />} />
 
         <Route path="/sell" element={<SellProduct />} />
+        <Route path="/sell/cars" element={<SellProduct />} />
+        <Route path="/sell/cars/add-vehicle" element={<SellProduct />} />
+        <Route path="/sell/cars/:slug" element={<SellProduct />} />
         <Route path="/sell/car" element={<SellCarOptions />} />
         <Route path="/sell/car/verify" element={<SellCarVerification />} />
         <Route path="/sell/car/dealer" element={<SellCarDealer />} />
         <Route path="/sell/car/auction" element={<SellCarAuction />} />
         <Route path="/sell/spare-parts" element={<SellSparePart />} />
+        <Route path="/sell/spare-parts/add-part" element={<SellSparePart />} />
+        <Route path="/sell/spare-parts/:slug" element={<SellSparePart />} />
         <Route path="/sell/electronics" element={<SellElectronics />} />
+        <Route path="/sell/electronics/add-item" element={<SellElectronics />} />
+        <Route path="/sell/electronics/:slug" element={<SellElectronics />} />
         <Route path="/sell/properties" element={<SellProperty />} />
+        <Route path="/sell/properties/add-property" element={<SellProperty />} />
+        <Route path="/sell/properties/:slug" element={<SellProperty />} />
         <Route path="/kyc" element={<Kyc />} />
         <Route path="/kyc/callback" element={<Kyc />} />
         <Route path="/user-verified" element={<UserVerified />} />
@@ -87,28 +100,33 @@ function App() {
         <Route path="/listing/:id" element={<ListingDetails />} />
 
         <Route path="/challan-payment" element={<ChallanPayment />} />
+        <Route path="/challan-payment/:rcNumber" element={<ChallanDetails />} />
+        <Route path="/challan" element={<ChallanPayment />} />
+        <Route path="/challan/:rcNumber" element={<ChallanDetails />} />
         <Route path="/vehicle-info" element={<VehicleInfo />} />
+        <Route path="/vehicle-info/:rcNumber" element={<RcDetails />} />
+        <Route path="/rc-status" element={<VehicleInfo />} />
+        <Route path="/rc-status/:rcNumber" element={<RcDetails />} />
         <Route path="/finance" element={<Finance />} />
         <Route path="/insurance" element={<Insurance />} />
         <Route path="/compare" element={<Compare />} />
         <Route path="/wishlist" element={<Wishlist />} />
+        <Route path="/notifications" element={<Notifications />} />
         <Route path="/profile" element={<Profile />} />
-
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
 
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />
         <Route path="/faq" element={<FAQPage />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/terms" element={<Terms />} />
-
-        {/* Root-level dealer storefronts (swipedeals.com/dealername). React Router v6 always
-            ranks static segments above dynamic ones, so this cannot shadow any route above. */}
         <Route path="/:dealerSlug" element={<DealerStorefront />} />
 
         <Route path="*" element={<NotFound />} />
       </Route>
+
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
     </Routes>
   )
 }

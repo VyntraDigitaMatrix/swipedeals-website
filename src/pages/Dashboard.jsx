@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import {
   Archive, Building2, Clock, Eye, FileCheck, Heart, ImagePlus, Laptop, LayoutDashboard, MessageCircle, PackageSearch,
   Pencil, RefreshCw, Rocket, ShieldCheck, ShoppingBag, Sliders, Sparkles, Star, Tags, Trash2, User as UserIcon, Wrench, X, XCircle,
@@ -12,12 +12,12 @@ import StatCard from '../components/dashboard/StatCard'
 import SimpleBarChart from '../components/dashboard/SimpleBarChart'
 import SimpleLineChart from '../components/dashboard/SimpleLineChart'
 import SavedListingsTable from '../components/dashboard/SavedListingsTable'
-// import SellerReviewSection from '../components/seller/SellerReviewSection'
 import PropertyImagesManager from '../components/dashboard/PropertyImagesManager'
 import VehicleImagesManager from '../components/dashboard/VehicleImagesManager'
 import VehicleDocumentsManager from '../components/dashboard/VehicleDocumentsManager'
 import VehicleFeaturesManager from '../components/dashboard/VehicleFeaturesManager'
 import VehicleSpecsManager from '../components/dashboard/VehicleSpecsManager'
+import UserLeadsSection from '../components/dashboard/UserLeadsSection'
 import ChatDrawer from '../components/chat/ChatDrawer'
 import Input from '../components/forms/Input'
 import Dropdown from '../components/forms/Dropdown'
@@ -31,6 +31,7 @@ import { usePropertyListings } from '../hooks/usePropertyListings'
 import { useSparePartsListings } from '../hooks/useSparePartsListings'
 import { useElectronicsListings } from '../hooks/useElectronicsListings'
 import { useChat } from '../hooks/useChat'
+import { useLeads } from '../hooks/useLeads'
 import {
   VEHICLE_BRANDS,
   VEHICLE_CONDITIONS,
@@ -193,6 +194,43 @@ export default function Dashboard() {
   const [chatRecipient, setChatRecipient] = useState(null)
   const [dashboardStats, setDashboardStats] = useState(null)
 
+  const tabsRailRef = useRef(null)
+  const [isMouseDown, setIsMouseDown] = useState(false)
+  const [startX, setStartX] = useState(0)
+  const [scrollLeftPos, setScrollLeftPos] = useState(0)
+
+  useEffect(() => {
+    const rail = tabsRailRef.current
+    if (!rail) return
+    const handleWheel = (e) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault()
+        rail.scrollLeft += e.deltaY * 1.2
+      }
+    }
+    rail.addEventListener('wheel', handleWheel, { passive: false })
+    return () => rail.removeEventListener('wheel', handleWheel)
+  }, [])
+
+  const handleMouseDown = (e) => {
+    if (!tabsRailRef.current) return
+    setIsMouseDown(true)
+    setStartX(e.pageX - tabsRailRef.current.offsetLeft)
+    setScrollLeftPos(tabsRailRef.current.scrollLeft)
+  }
+
+  const handleMouseLeaveOrUp = () => {
+    setIsMouseDown(false)
+  }
+
+  const handleMouseMove = (e) => {
+    if (!isMouseDown || !tabsRailRef.current) return
+    e.preventDefault()
+    const x = e.pageX - tabsRailRef.current.offsetLeft
+    const walk = (x - startX) * 1.5
+    tabsRailRef.current.scrollLeft = scrollLeftPos - walk
+  }
+
   const handleSubmitVehicle = async (slug) => {
     if (!window.confirm('Submit this vehicle listing for approval?')) return
     try {
@@ -211,20 +249,23 @@ export default function Dashboard() {
 
   const { conversations: apiConversations, loading: chatLoading, selectConversation } = useChat(true)
 
+  const { leads: userLeadsList, pagination: leadsPagination, fetchLeads: fetchLeadsList } = useLeads()
+
   useEffect(() => {
     fetchListings().catch(() => { })
     fetchArchivedListings().catch(() => { })
     fetchPropertyListings().catch(() => { })
     fetchElectronicsListings().catch(() => { })
     fetchSparePartsListings().catch(() => { })
-    
+    fetchLeadsList({ page: 0, size: 10 }).catch(() => { })
+
     // Fetch dashboard stats from backend
     userProfileService.getDashboardStats()
       .then((res) => {
         if (res?.data) setDashboardStats(res.data)
       })
       .catch((err) => console.error('Failed to fetch dashboard stats:', err))
-  }, [fetchListings, fetchArchivedListings, fetchPropertyListings, fetchElectronicsListings, fetchSparePartsListings])
+  }, [fetchListings, fetchArchivedListings, fetchPropertyListings, fetchElectronicsListings, fetchSparePartsListings, fetchLeadsList])
 
   const savedItems = findItemsByIds(wishlist).map((item) => ({ ...item, categoryLabel: CATEGORY_LABELS[item.category] }))
   const localListings = user?.phone ? getByPhone(user.phone) : []
@@ -246,11 +287,12 @@ export default function Dashboard() {
 
   // Use dashboard API stats if available, otherwise fallback to local calculation
   const displayTotalListings = dashboardStats?.totalProducts ?? combinedListingsCount
-  const displayTotalLeads = dashboardStats?.totalLeads ?? 0
+  const displayTotalLeads = dashboardStats?.totalLeads ?? leadsPagination?.totalElements ?? userLeadsList.length
   const displayTotalArchived = dashboardStats?.totalArchivedProducts ?? totalArchivedCount
 
   const TABS = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, count: null },
+    { id: 'leads', label: 'User Leads', icon: PackageSearch, count: displayTotalLeads },
     { id: 'listings', label: 'My Listings', icon: Tags, count: displayTotalListings },
     { id: 'archived', label: 'Archived Listings', icon: Archive, count: displayTotalArchived },
     { id: 'properties', label: 'My Properties', icon: Building2, count: propertyListings.length },
@@ -408,7 +450,17 @@ export default function Dashboard() {
       </div>
 
       {/* Tab rail */}
-      <div className="no-scrollbar mb-8 flex gap-1.5 overflow-x-auto rounded-2xl border border-border bg-surface-alt/60 p-1.5">
+      <div
+        ref={tabsRailRef}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={handleMouseLeaveOrUp}
+        onMouseUp={handleMouseLeaveOrUp}
+        onMouseMove={handleMouseMove}
+        className={cn(
+          'no-scrollbar mb-8 flex gap-1.5 overflow-x-auto rounded-2xl border border-border bg-surface-alt/60 p-1.5 select-none',
+          isMouseDown ? 'cursor-grabbing' : 'cursor-grab'
+        )}
+      >
         {TABS.map((t) => {
           const active = tab === t.id
           return (
@@ -609,7 +661,7 @@ export default function Dashboard() {
                     </div>
 
                     <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-                      <Link to={`/cars/${v.slug}`} className="text-xs font-semibold text-primary hover:underline">
+                      <Link to={`/cars/${v.slug}?from=sell`} state={{ from: '/sell/cars' }} className="text-xs font-semibold text-primary hover:underline">
                         View details &rarr;
                       </Link>
                       <div className="flex flex-wrap gap-1.5">
@@ -1609,6 +1661,10 @@ export default function Dashboard() {
         </div>
       )}
 
+      {tab === 'leads' && (
+        <UserLeadsSection />
+      )}
+
       {tab === 'inquiries' && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {userInquiries.map((inquiry) => (
@@ -1846,6 +1902,7 @@ export default function Dashboard() {
       {managingImagesForSlug && (
         <PropertyImagesManager
           slug={managingImagesForSlug}
+          isDealer={user?.role === 'DEALER'}
           onClose={() => {
             setManagingImagesForSlug(null)
             fetchPropertyListings() // refresh listings to pick up new primary images

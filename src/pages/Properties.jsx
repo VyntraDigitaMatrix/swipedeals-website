@@ -10,7 +10,7 @@ import PropertyCard from '../components/property/PropertyCard'
 import CommunityListingsStrip from '../components/common/CommunityListingsStrip'
 import { propertyService, mapPropertyToCard } from '../services/publicListingService'
 
-const PAGE_SIZE = 8
+const PAGE_SIZE = 9
 
 // A pre-existing link elsewhere in the app may still pass ?purpose=Buy —
 // map that onto the real "Sale" bucket our mapped data uses.

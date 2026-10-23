@@ -16,8 +16,17 @@ export function extractImages(item) {
 }
 
 export const vehicleService = {
-  // params: { type: 'CAR'|'BIKE'|'TRUCK'|'OTHER', condition: 'NEW'|'USED', page, size, sort }
-  getAll: async (params = {}) => (await api.get('/api/public/vehicles', { params })).data,
+  // params: { vehicleType: 'CARS'|'TWO_WHEELER'|'CONSTRUCTION_VEHICLES'|'COMMERCIAL_VEHICLES'|'OTHERS', condition, page, size, sort }
+  getAll: async (params = {}) => {
+    const queryParams = { ...params }
+    if (queryParams.type && !queryParams.vehicleType) {
+      if (queryParams.type === 'CAR') queryParams.vehicleType = 'CARS'
+      else if (queryParams.type === 'TRUCK') queryParams.vehicleType = 'COMMERCIAL_VEHICLES'
+      else queryParams.vehicleType = queryParams.type
+      delete queryParams.type
+    }
+    return (await api.get('/api/public/vehicles', { params: queryParams })).data
+  },
   getBySlug: async (slug) => (await api.get(`/api/public/vehicles/${slug}`)).data,
   getImages: async (slug) => (await api.get(`/api/public/vehicles/${slug}/images`)).data,
 }

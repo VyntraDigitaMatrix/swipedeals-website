@@ -11,7 +11,5 @@ export function titleCaseEnum(value) {
     .join(' ')
 }
 
-// Used whenever a listing has no uploaded photos yet — the public catalog
-// APIs don't return images (that's an admin-only upload flow today), so
-// every real listing falls back to this neutral placeholder for now.
-export const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=60'
+// Used whenever a listing has no uploaded photos yet.
+export const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?auto=format&fit=crop&w=800&q=80'

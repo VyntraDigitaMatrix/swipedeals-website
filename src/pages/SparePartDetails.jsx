@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useLocation, useSearchParams } from 'react-router-dom'
 import { Calendar, Clock, Layers, Package, Shield, Tag, Wrench } from 'lucide-react'
 import DetailLayout from '../components/listing/DetailLayout'
 import SparePartCard from '../components/cards/SparePartCard'
@@ -7,11 +7,15 @@ import EmptyState from '../components/common/EmptyState'
 import { sparePartsService, mapSparePartToCard, extractImages } from '../services/publicListingService'
 import { sparePartsListingService } from '../services/sparePartsListingService'
 import { usePublicImages } from '../hooks/usePublicImages'
+import { useAuth } from '../hooks/useAuth'
 import { PLACEHOLDER_IMAGE, titleCaseEnum } from '../utils/enumFormat'
 import { formatCurrencyFull, formatDate } from '../utils/format'
 
 export default function SparePartDetails() {
   const { id: slug } = useParams()
+  const location = useLocation()
+  const [searchParams] = useSearchParams()
+  const { user } = useAuth()
 
   const [raw, setRaw] = useState(null)
   const [similarRaw, setSimilarRaw] = useState([])
@@ -97,6 +101,7 @@ export default function SparePartDetails() {
   const mapped = mapSparePartToCard(raw)
   const part = {
     ...mapped,
+    productType: 'SPARE_PART',
     images: images.length > 0 && images[0] !== PLACEHOLDER_IMAGE ? images : partImages,
     location: '',
     sellerId: raw.seller?.sellerId || raw.sellerId || mapped.sellerId,
@@ -126,11 +131,23 @@ export default function SparePartDetails() {
     { label: 'Updated At', value: formatDate(raw.updatedAt), icon: Clock },
   ].filter((s) => s.value !== null && s.value !== undefined && s.value !== '')
 
+  const isFromSell =
+    location.state?.from === '/sell/spare-parts' ||
+    location.state?.from?.startsWith('/sell') ||
+    searchParams.get('from') === 'sell' ||
+    searchParams.get('source') === 'sell' ||
+    raw?.status === 'DRAFT' ||
+    raw?.status === 'PENDING_APPROVAL' ||
+    raw?.status === 'UNDER_REVIEW' ||
+    Boolean(user?.id && raw?.seller?.sellerId && String(raw?.seller?.sellerId) === String(user?.id))
+
+  const breadcrumbTo = isFromSell ? '/sell/spare-parts' : '/spare-parts'
+
   return (
     <DetailLayout
       item={part}
       breadcrumbLabel="Spare Parts"
-      breadcrumbTo="/spare-parts"
+      breadcrumbTo={breadcrumbTo}
       badges={[
         { label: raw.condition === 'NEW' ? 'New' : 'Used', variant: raw.condition === 'NEW' ? 'success' : 'neutral' },
         ...(raw.category ? [{ label: titleCaseEnum(raw.category), variant: 'neutral', icon: Wrench }] : []),

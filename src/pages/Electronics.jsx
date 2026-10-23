@@ -10,7 +10,7 @@ import ElectronicsCard from '../components/electronics/ElectronicsCard'
 import CommunityListingsStrip from '../components/common/CommunityListingsStrip'
 import { electronicsService, mapElectronicsToCard } from '../services/publicListingService'
 
-const PAGE_SIZE = 8
+const PAGE_SIZE = 9
 
 export default function Electronics() {
   const [searchParams] = useSearchParams()

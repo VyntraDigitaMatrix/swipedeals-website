@@ -67,7 +67,7 @@ export default function CommercialVehicleDetails() {
     if (!raw) return
     let cancelled = false
     vehicleService
-      .getAll({ type: 'TRUCK', size: 7, sort: 'createdAt,desc' })
+      .getAll({ vehicleType: 'COMMERCIAL_VEHICLES', size: 7, sort: 'createdAt,desc' })
       .then((res) => {
         if (cancelled) return
         const content = res?.data?.content
@@ -97,6 +97,7 @@ export default function CommercialVehicleDetails() {
   const mapped = mapVehicleToCommercialCard(raw)
   const vehicle = {
     ...mapped,
+    productType: 'VEHICLE',
     images: images.length > 0 && images[0] !== PLACEHOLDER_IMAGE ? images : carImages,
     location: '',
   }

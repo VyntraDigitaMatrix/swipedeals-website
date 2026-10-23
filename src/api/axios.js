@@ -52,7 +52,7 @@ api.interceptors.response.use(
 
     const isAuthEndpoint =
       originalRequest?.url?.includes('/api/user/auth/login') ||
-      originalRequest?.url?.includes('/api/user/auth/register') ||
+      originalRequest?.url?.includes('/api/user') ||
       originalRequest?.url?.includes('/api/user/auth/refresh-token')
 
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {

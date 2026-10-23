@@ -11,7 +11,7 @@ import CommunityListingsStrip from '../components/common/CommunityListingsStrip'
 import { vehicleService, mapVehicleToCarCard } from '../services/publicListingService'
 import { cn } from '../utils/cn'
 
-const PAGE_SIZE = 8
+const PAGE_SIZE = 9
 
 const PRICE_PRESETS = [
   { label: 'Under ₹5L', value: [0, 500000] },
@@ -43,7 +43,7 @@ export default function CarsListing() {
     let cancelled = false
     setLoading(true)
     vehicleService
-      .getAll({ type: 'CAR', condition: routeType ? routeType.toUpperCase() : undefined, size: 100, sort: 'createdAt,desc' })
+      .getAll({ vehicleType: 'CARS', condition: routeType ? routeType.toUpperCase() : undefined, size: 100, sort: 'createdAt,desc' })
       .then((res) => {
         if (cancelled) return
         const content = res?.data?.content
